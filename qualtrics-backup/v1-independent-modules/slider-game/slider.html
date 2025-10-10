@@ -1,0 +1,481 @@
+<div class="main-container">
+    <!-- Game Container - Now on top -->
+    <div class="game-container">
+        <div class="game-header">
+            <div class="game-title">Game 1: Slider Precision Game</div>
+            <div class="progress-indicator">
+                Task <span id="currentTask">1</span> of 3
+            </div>
+            <div id="difficultyBadge" class="difficulty-badge difficulty-easy">Easy</div>
+        </div>
+        
+        <div id="taskArea" class="task-area">
+            <div class="task-instruction">
+                Please move the slider to <span id="targetValue">6</span>
+            </div>
+            
+            <div class="slider-container">
+                <div class="slider-labels">
+                    <span class="slider-label-left">0</span>
+                    <span class="slider-label-right">10</span>
+                </div>
+                <input type="range" id="gameSlider" class="slider" min="0" max="10" step="1" value="5">
+            </div>
+            
+            <div id="valueDisplay" class="value-display">5</div>
+            
+            <button id="submitBtn" class="submit-btn">Submit</button>
+        </div>
+        
+        <div id="resultsContainer" class="results-container">
+            <h3 style="text-align: center; color: #333;">Game Complete!</h3>
+            <div class="result-item">
+                <span class="result-label">Total Time:</span>
+                <span id="totalTime" class="result-value"></span>
+            </div>
+            <div class="result-item">
+                <span class="result-label">Average Accuracy:</span>
+                <span id="avgAccuracy" class="result-value"></span>
+            </div>
+            <div class="result-item">
+                <span class="result-label">Task Breakdown:</span>
+                <div id="taskBreakdown" style="margin-top: 10px;"></div>
+            </div>
+            <button id="restartBtn" class="submit-btn" style="margin-top: 30px;">Try Again</button>
+        </div>
+    </div>
+    
+    <!-- Chatbox Container - Now below -->
+    <div class="chatbox-container">
+        <div class="chat-header">
+            <div class="chat-title">AI Assistant Chat</div>
+            <div class="chat-status">
+                <span class="status-dot"></span>
+                <span class="status-text">Online</span>
+            </div>
+        </div>
+        
+        <div id="chatbox"></div>
+        
+        <div class="chat-input-container">
+            <input id="userInput" placeholder="Ask me anything..." type="text" />
+            <button id="sendBtn">
+                <span class="send-icon">➤</span>
+            </button>
+        </div>
+        
+        <div class="chat-counters">
+            <div id="promptCounter"></div>
+            <div id="tokenCounter"></div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Container for both chatbox and game - now stacked vertically */
+.main-container {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    max-width: 800px;
+    margin: 0 auto;
+    width: 100%;
+}
+
+/* Game container */
+.game-container {
+    width: 100%;
+    border: 2px solid #4CAF50;
+    border-radius: 8px;
+    padding: 20px;
+    background-color: #f9f9f9;
+    box-sizing: border-box;
+}
+
+/* Chatbox container */
+.chatbox-container {
+    width: 100%;
+    box-sizing: border-box;
+    border: 2px solid #2196F3;
+    border-radius: 8px;
+    overflow: hidden;
+    background-color: #ffffff;
+}
+
+/* Chat header */
+.chat-header {
+    background: linear-gradient(135deg, #2196F3, #1976D2);
+    color: white;
+    padding: 15px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.chat-title {
+    font-size: 18px;
+    font-weight: bold;
+}
+
+.chat-status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 14px;
+}
+
+.status-dot {
+    width: 8px;
+    height: 8px;
+    background-color: #4CAF50;
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.7);
+    }
+    70% {
+        box-shadow: 0 0 0 6px rgba(76, 175, 80, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(76, 175, 80, 0);
+    }
+}
+
+/* Ensure chatbox has same visual width as game */
+#chatbox {
+    padding: 20px;
+    width: 100%;
+    height: 400px;
+    overflow-y: auto;
+    background: #f8f9fa;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 14px;
+    box-sizing: border-box;
+    line-height: 1.5;
+}
+
+/* Style for chat messages */
+#chatbox p {
+    margin: 8px 0;
+    padding: 10px 14px;
+    border-radius: 12px;
+    max-width: 80%;
+    word-wrap: break-word;
+}
+
+/* User messages */
+#chatbox p:has(b:contains("You:")) {
+    background-color: #e3f2fd;
+    margin-left: auto;
+    text-align: right;
+}
+
+/* AI messages */
+#chatbox p:has(b:contains("AI:")) {
+    background-color: #ffffff;
+    border: 1px solid #e0e0e0;
+    margin-right: auto;
+}
+
+/* System messages */
+#chatbox p:has(b:contains("System:")) {
+    background-color: #fff3cd;
+    border: 1px solid #ffeaa7;
+    margin: 10px auto;
+    text-align: center;
+    max-width: 90%;
+}
+
+/* Chat input container */
+.chat-input-container {
+    display: flex;
+    gap: 10px;
+    padding: 15px;
+    background-color: #f5f5f5;
+    border-top: 1px solid #e0e0e0;
+}
+
+#userInput {
+    flex: 1;
+    padding: 12px 16px;
+    border: 2px solid #e0e0e0;
+    border-radius: 24px;
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.3s;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+#userInput:focus {
+    border-color: #2196F3;
+}
+
+#sendBtn {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #2196F3, #1976D2);
+    color: white;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+#sendBtn:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+
+#sendBtn:active {
+    transform: scale(0.95);
+}
+
+.send-icon {
+    font-size: 20px;
+    transform: translateX(-1px);
+}
+
+/* Chat counters */
+.chat-counters {
+    display: flex;
+    gap: 10px;
+    padding: 10px 15px;
+    background-color: #f5f5f5;
+    border-top: 1px solid #e0e0e0;
+}
+
+#promptCounter, #tokenCounter {
+    flex: 1;
+    text-align: center;
+    font-size: 13px;
+    color: #666;
+}
+
+/* Custom scrollbar for chatbox */
+#chatbox::-webkit-scrollbar {
+    width: 8px;
+}
+
+#chatbox::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+#chatbox::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
+}
+
+#chatbox::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+/* Game header */
+.game-header {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.game-title {
+    font-size: 24px;
+    font-weight: bold;
+    color: #333;
+    margin-bottom: 10px;
+}
+
+.difficulty-badge {
+    display: inline-block;
+    padding: 5px 15px;
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+.difficulty-easy {
+    background-color: #4CAF50;
+    color: white;
+}
+
+.difficulty-medium {
+    background-color: #FF9800;
+    color: white;
+}
+
+.difficulty-hard {
+    background-color: #f44336;
+    color: white;
+}
+
+/* Task area */
+.task-area {
+    background-color: white;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.task-instruction {
+    font-size: 18px;
+    font-weight: bold;
+    color: #333;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+/* Slider container */
+.slider-container {
+    margin: 30px 0;
+    position: relative;
+}
+
+/* Slider labels */
+.slider-labels {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 10px;
+    font-size: 16px;
+    font-weight: bold;
+    color: #666;
+}
+
+.slider-label-left {
+    margin-left: 12px;
+}
+
+.slider-label-right {
+    margin-right: 12px;
+}
+
+.slider {
+    width: 100%;
+    height: 8px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: #ddd;
+    outline: none;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+    cursor: pointer;
+}
+
+.slider:hover {
+    opacity: 1;
+}
+
+.slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 25px;
+    height: 25px;
+    background: #4CAF50;
+    cursor: pointer;
+    border-radius: 50%;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.slider::-moz-range-thumb {
+    width: 25px;
+    height: 25px;
+    background: #4CAF50;
+    cursor: pointer;
+    border-radius: 50%;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+/* Value display */
+.value-display {
+    text-align: center;
+    font-size: 36px;
+    font-weight: bold;
+    color: #4CAF50;
+    margin-top: 20px;
+    min-height: 50px;
+}
+
+/* Submit button */
+.submit-btn {
+    display: block;
+    width: 200px;
+    margin: 20px auto;
+    padding: 12px 24px;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+.submit-btn:hover {
+    background-color: #45a049;
+}
+
+.submit-btn:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
+}
+
+/* Results display */
+.results-container {
+    background-color: white;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 20px;
+    display: none;
+}
+
+.result-item {
+    margin: 10px 0;
+    padding: 10px;
+    background-color: #f5f5f5;
+    border-radius: 4px;
+}
+
+.result-label {
+    font-weight: bold;
+    color: #666;
+}
+
+.result-value {
+    color: #333;
+    font-size: 18px;
+}
+
+/* Progress indicator */
+.progress-indicator {
+    text-align: center;
+    margin-bottom: 10px;
+    color: #666;
+    font-size: 14px;
+}
+
+/* Task breakdown item */
+.task-breakdown-item {
+    margin: 5px 0;
+    padding: 8px;
+    background: #f0f0f0;
+    border-radius: 3px;
+    font-family: Arial, sans-serif;
+}
+
+.task-breakdown-header {
+    font-weight: bold;
+    color: #333;
+    margin-bottom: 5px;
+}
+
+.task-breakdown-details {
+    color: #555;
+    font-size: 14px;
+    line-height: 1.4;
+}
+</style>

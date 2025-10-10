@@ -1,0 +1,7 @@
+.env
+.vercel
+
+# Data folder - exclude all data files to prevent public sharing
+data/
+*.csv
+*.json
