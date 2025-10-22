@@ -4,4 +4,7 @@
 # Data folder - exclude all data files to prevent public sharing
 data/
 *.csv
-*.json
+# Exclude data JSON files but keep essential config files
+data/*.json
+firestore.indexes.json
+firestore.rules

@@ -1,0 +1,45 @@
+{
+  "name": "bobalab-game",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "lint": "eslint .",
+    "preview": "vite preview",
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "firebase": "^10.12.2",
+    "firebase-admin": "^13.5.0",
+    "json2csv": "^6.0.0-alpha.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.7.0",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "eslint": "^9.7.0",
+    "eslint-plugin-react": "^7.34.3",
+    "eslint-plugin-react-hooks": "^5.1.0-rc.0",
+    "eslint-plugin-react-refresh": "^0.4.7",
+    "globals": "^15.8.0",
+    "vite": "^5.3.4"
+  },
+  "description": "An interactive React-based educational game where players act as instructors trying to maximize student learning through strategic teaching task management. Players complete three types of tasks across multiple semesters with time pressure and AI assistance.",
+  "main": "eslint.config.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/minggangli1030/bobalab-backward-planning.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/minggangli1030/bobalab-backward-planning/issues"
+  },
+  "homepage": "https://github.com/minggangli1030/bobalab-backward-planning#readme"
+}
