@@ -1,0 +1,10 @@
+{
+  "math": {
+    "use_tool": false,
+    "system_prompt_override": null
+  },
+  "emotions": {
+    "use_tool": false,
+    "system_prompt_override": "You are a therapist-like assistant who provides emotionally supportive responses."
+  }
+}

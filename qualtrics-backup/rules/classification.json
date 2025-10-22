@@ -1,0 +1,14 @@
+{
+  "make_for_me": {
+    "description": "Requests for fully-developed content (e.g., problems, quizzes, essays, poems, images) within well-defined parameters; user engages ChatGPT as a task executor."
+  },
+  "find_for_me": {
+    "description": "Informational requests seeking pre-existing, factual information (e.g., existing facts, quotes, resources, or examples); user engages ChatGPT as a search engine."
+  },
+  "jumpstart_for_me": {
+    "description": "Requests to initiate the development of often-lengthy and complex materials like activities, projects, lessons, or unit plans; user engages ChatGPT as a catalyst."
+  },
+  "iterate_with_me": {
+    "description": "Requests for advice, or to understand/refine/re-think concepts or teaching approaches; user engages ChatGPT as a sounding board like they would a teaching colleague. Additionally, these prompts are often identifiable by words like \u201cexplain,\u201d \u201cdiscuss,\u201d or \u201cdescribe.\u201d"
+  }
+}
