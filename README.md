@@ -45,11 +45,13 @@ npm run preview
 
 ## 🏗️ Architecture
 
-### Core Game Flow
+### Core Game Flow (V2)
 1. **Student Login** → Access code validation
 2. **Practice Mode** → Mandatory practice requiring 100% accuracy
-3. **Main Game** → Timed teaching simulation (20min students, 2min admin)
-4. **Completion** → Unique completion code generation
+3. **Task Allocation** → Allocate 10 tasks among 3 types with AI assistance
+4. **Main Game** → Linear progression of allocated tasks with switching capability
+5. **Bonus Round** → Optional extra tasks if finished early
+6. **Completion** → Unique completion code generation
 
 ### Key Components
 - **App.jsx** (2835+ lines) - Main game orchestrator
@@ -157,7 +159,15 @@ VITE_FIREBASE_APP_ID=your_app_id
 
 ## 📈 Recent Improvements
 
-### Latest Updates (December 2024)
+### Latest Updates (V2 - January 2025)
+- **New Game Flow**: Introduced Task Allocation and Linear Progression.
+- **Task Allocation**: Participants choose their mix of 10 tasks (Slider, Counting, Typing).
+- **Task Switching**: Ability to defer current task to the end of the queue.
+- **UI Overhaul**: New Task Runner layout with global timer, points, and task counter.
+- **Bonus Round**: Opportunity to earn extra points if tasks are completed early.
+- **AI Assistance**: Added AI help for task allocation decision.
+
+### Previous Updates (December 2024)
 - **Expanded Level System**: Increased from 50 to 100 levels per task type (300 total)
 - **Qualtrics Integration**: Fixed Next button visibility issues with enhanced message passing
 - **Time Tracking**: Fixed duration display in ADMIN-MASTER dashboard with periodic updates

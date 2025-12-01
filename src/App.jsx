@@ -18,6 +18,9 @@ import GameModeSelector from "./components/GameModeSelector";
 import CompletionCodeDisplay from "./components/CompletionCodeDisplay";
 import MasterAdmin from "./components/MasterAdmin";
 import { qualtricsMessenger } from "./utils/qualtricsMessenger";
+import TaskAllocationScreen from "./components/TaskAllocationScreen";
+import TaskRunnerLayout from "./components/TaskRunnerLayout";
+import BonusRoundScreen from "./components/BonusRoundScreen";
 
 // Helper function to calculate Levenshtein distance
 function calculateLevenshteinDistance(str1, str2) {
@@ -107,6 +110,12 @@ function App() {
   const [materialsAtResearchLevel, setMaterialsAtResearchLevel] = useState({});
   const [taskAttempts, setTaskAttempts] = useState({});
   const [taskPoints, setTaskPoints] = useState({});
+
+  // NEW: Task Queue State
+  const [taskQueue, setTaskQueue] = useState([]);
+  const [currentTaskIndex, setCurrentTaskIndex] = useState(0);
+  const [allocationCounts, setAllocationCounts] = useState(null);
+  const [isBonusRound, setIsBonusRound] = useState(false);
 
   // Refs
   const startTimeRef = useRef(Date.now());
@@ -635,31 +644,80 @@ function App() {
     setCategoryPoints({ materials: 0, research: 0, engagement: 0, bonus: 0 });
     setMaterialsAtResearchLevel({});
 
-    setMode("challenge");
+    // NEW: Go to allocation screen first
+    setMode("allocation");
+    
+    // Reset other states
     setCompleted({});
     setCompletedLevels(0);
     setSwitches(0);
     setBonusPrompts(0);
-    setCurrentTab("g2t1"); // Start with materials
     setCheckpointReached(false);
-
-    // Reset teaching points
     setTaskAttempts({});
     setTaskPoints({});
+    
+    // Timer will be started after allocation
+  };
 
-    // Start timer (it will handle time limit setting)
+  const handleAllocationStart = (queue, counts) => {
+    setTaskQueue(queue);
+    setAllocationCounts(counts);
+    setCurrentTaskIndex(0);
+    setMode("challenge");
+    
+    // Determine first task ID
+    const firstType = queue[0];
+    // Since it's start, all levels are 1
+    const firstTab = `${firstType}t1`;
+    setCurrentTab(firstTab);
+    
+    setTaskStartTimes({ [firstTab]: Date.now() });
+    eventTracker.setPageStartTime(firstTab);
+    
+    // Start global timer
     startTimer();
-
-    setTaskStartTimes({ g2t1: Date.now() });
-    eventTracker.setPageStartTime("g2t1");
-    eventTracker.logEvent("game_start", {
-      practiceCompleted: practiceChoice === "yes",
-      timestamp: Date.now(),
-      gameMode: gameMode,
-      currentSemester: currentSemester,
-      totalSemesters: totalSemesters,
-      isAdminMode: isAdminMode,
+    
+    eventTracker.logEvent("allocation_complete", {
+      counts,
+      queue,
+      timestamp: Date.now()
     });
+  };
+
+  const handleSwitchTask = (targetType) => {
+    // 1. Move current task to end
+    // 2. Find first targetType and move to current
+    
+    const currentType = taskQueue[currentTaskIndex];
+    if (currentType === targetType) return; // Should be disabled in UI anyway
+    
+    const newQueue = [...taskQueue];
+    
+    // Remove current
+    const currentItem = newQueue.splice(currentTaskIndex, 1)[0];
+    newQueue.push(currentItem);
+    
+    // Find target (search from current index, as we shifted everything left)
+    // Actually, since we removed one, the next item is now at currentTaskIndex.
+    // We search from currentTaskIndex to find the target.
+    const targetIndex = newQueue.findIndex((t, i) => i >= currentTaskIndex && t.startsWith(targetType));
+    
+    if (targetIndex !== -1) {
+      const targetItem = newQueue.splice(targetIndex, 1)[0];
+      newQueue.splice(currentTaskIndex, 0, targetItem);
+      
+      setTaskQueue(newQueue);
+      setSwitches(prev => prev + 1);
+      
+      // Update Current Tab
+      // We need to calculate the level for this new task type
+      const type = targetItem; // e.g. 'g2'
+      const completedCount = Object.keys(completed).filter(k => k.startsWith(type)).length;
+      const nextLevel = completedCount + 1;
+      const newTab = `${type}t${nextLevel}`;
+      
+      handleTabSwitch(newTab);
+    }
   };
 
   // Handle task completion
@@ -886,19 +944,46 @@ function App() {
       });
     }
 
-    // Auto-advance to next task immediately (no delay to prevent clashing with manual switching)
-    // Prevent advance if user already switched
-    if (currentTab !== tabId) return;
-
-    const currentGame = tabId[1];
-    const currentTaskNum = parseInt(tabId.substring(3)); // Fix parsing for 2-digit numbers
-
-    // Try next task in same game
-    if (currentTaskNum < 100) {
-      // Updated to 100 tasks
-      const nextTask = `g${currentGame}t${currentTaskNum + 1}`;
-      if (!completed[nextTask]) {
-        handleTabSwitch(nextTask, true);
+    // Auto-advance logic for Queue System
+    const nextIndex = currentTaskIndex + 1;
+    
+    if (nextIndex < taskQueue.length) {
+      setCurrentTaskIndex(nextIndex);
+      
+      const nextType = taskQueue[nextIndex];
+      // Calculate level
+      // Note: we just added to completed, so count includes the one just finished if it was same type
+      // But we need to be careful. `completed` update might not be reflected immediately in `completed` state variable if we use it here?
+      // Actually `setCompleted` is async-ish (batch update). 
+      // Better to use the local `completed` plus the one we just added.
+      
+      // Count completed of nextType
+      let count = Object.keys(completed).filter(k => k.startsWith(nextType)).length;
+      if (nextType === tabId.substring(0, 2)) {
+         // If next type is same as current, we just finished one, so count is correct (assuming completed not updated yet? No, React state...)
+         // Safest is to calculate from scratch or increment.
+         // If we just finished g2t1, and next is g2, we want g2t2.
+         // If we just finished g2t1, and next is g1, we want g1t(completed_g1 + 1).
+         
+         // Let's use the updated `completed` logic:
+         // We know we just finished `tabId`.
+         if (tabId.startsWith(nextType)) {
+             count += 1;
+         }
+      }
+      
+      const nextLevel = count + 1;
+      const nextTab = `${nextType}t${nextLevel}`;
+      
+      handleTabSwitch(nextTab, true);
+      
+    } else {
+      // Queue finished!
+      // Check time
+      if (timeRemaining > 0) {
+        setMode("bonus_round");
+      } else {
+        handleGameComplete("all_tasks_done");
       }
     }
   };
@@ -1682,6 +1767,9 @@ function App() {
               Start Semester {currentSemester}
             </button>
 
+
+
+
             {isAdminMode && (
               <div
                 style={{
@@ -2301,8 +2389,9 @@ function App() {
                   {finalStudentLearning}
                 </div>
               </div>
+            </div>
 
-              {/* Only show checkpoint bonus in semester 2 or if bonus exists */}
+            {/* Only show checkpoint bonus in semester 2 or if bonus exists */}
               {(currentSemester === 2 || totalBonus > 0) && (
                 <div
                   style={{
@@ -2527,7 +2616,7 @@ function App() {
               </div>
             </div>
           )}
-        </div>
+
 
         {/* Next semester or finish button */}
         <div style={{ marginTop: "30px", textAlign: "center" }}>
@@ -2573,457 +2662,57 @@ function App() {
   }
 
   // Main challenge mode
+  // Allocation Screen
+  if (mode === "allocation") {
+    return <TaskAllocationScreen onStart={handleAllocationStart} />;
+  }
+
+  // Bonus Round Screen
+  if (mode === "bonus_round") {
+    return (
+      <BonusRoundScreen 
+        timeRemaining={timeRemaining}
+        onSelectTask={(type) => {
+           // Add to queue and continue
+           const newQueue = [...taskQueue, type];
+           setTaskQueue(newQueue);
+           // currentTaskIndex is already at end (length of old queue)
+           // So it will point to this new item
+           
+           // Determine ID
+           const count = Object.keys(completed).filter(k => k.startsWith(type)).length;
+           const nextTab = `${type}t${count + 1}`;
+           
+           setMode("challenge");
+           handleTabSwitch(nextTab, true);
+        }}
+        onFinishEarly={() => handleGameComplete("finished_early")}
+      />
+    );
+  }
+
+  // Default: Challenge Mode (Task Runner)
   return (
     <div className="app">
-      {/* Checkpoint Modal */}
-      {isInBreak && breakDestination === "checkpoint" && (
-        <div
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            width: "100%",
-            height: "100%",
-            background: "rgba(0, 0, 0, 0.8)",
-            zIndex: 999999,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <div
-            style={{
-              background: "white",
-              padding: "40px",
-              borderRadius: "12px",
-              textAlign: "center",
-              maxWidth: "700px",
-              width: "90%",
-              maxHeight: "90vh",
-              overflow: "auto",
-            }}
-          >
-            <h2
-              style={{
-                color: "#4CAF50",
-                marginBottom: "25px",
-                fontSize: "28px",
-              }}
-            >
-              📚 Midterm Exam Results!
-            </h2>
-
-            <div
-              style={{
-                fontSize: "18px",
-                marginBottom: "25px",
-                padding: "20px",
-                background: "#f8f9fa",
-                borderRadius: "8px",
-              }}
-            >
-              <p style={{ marginBottom: "15px" }}>
-                The midterm exam has arrived! Let's see how your students
-                performed...
-              </p>
-
-              <div
-                style={{
-                  fontSize: "20px",
-                  fontWeight: "bold",
-                  color: "#1976d2",
-                  padding: "15px",
-                  background: "white",
-                  borderRadius: "6px",
-                  margin: "15px 0",
-                }}
-              >
-                Student Learning Score: {Math.round(calculateStudentLearning())}{" "}
-                pts
-              </div>
-            </div>
-
-            {/* Teaching breakdown */}
-            <div
-              style={{
-                marginBottom: "25px",
-                padding: "20px",
-                background: "#e3f2fd",
-                borderRadius: "8px",
-                textAlign: "left",
-              }}
-            >
-              <h3 style={{ marginBottom: "15px", textAlign: "center" }}>
-                Your Teaching Performance:
-              </h3>
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 1fr 1fr",
-                  gap: "10px",
-                }}
-              >
-                <div
-                  style={{
-                    padding: "10px",
-                    background: "white",
-                    borderRadius: "6px",
-                    textAlign: "center",
-                  }}
-                >
-                  <div style={{ color: "#4CAF50", fontWeight: "bold" }}>
-                    Materials
-                  </div>
-                  <div style={{ fontSize: "20px" }}>
-                    {categoryPoints.materials} pts
-                  </div>
-                </div>
-                <div
-                  style={{
-                    padding: "10px",
-                    background: "white",
-                    borderRadius: "6px",
-                    textAlign: "center",
-                  }}
-                >
-                  <div style={{ color: "#9C27B0", fontWeight: "bold" }}>
-                    Research
-                  </div>
-                  <div style={{ fontSize: "20px" }}>
-                    {categoryPoints.research} pts
-                  </div>
-                  <div style={{ fontSize: "12px", color: "#666" }}>
-                    ×{(1 + categoryPoints.research * 0.15).toFixed(2)}
-                  </div>
-                </div>
-                <div
-                  style={{
-                    padding: "10px",
-                    background: "white",
-                    borderRadius: "6px",
-                    textAlign: "center",
-                  }}
-                >
-                  <div style={{ color: "#f44336", fontWeight: "bold" }}>
-                    Engagement
-                  </div>
-                  <div style={{ fontSize: "20px" }}>
-                    {categoryPoints.engagement} pts
-                  </div>
-                  <div style={{ fontSize: "12px", color: "#666" }}>
-                    +{(categoryPoints.engagement * 0.15).toFixed(1)}% interest
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Bonus result */}
-            <div
-              style={{
-                fontSize: "24px",
-                fontWeight: "bold",
-                padding: "20px",
-                borderRadius: "8px",
-                marginBottom: "25px",
-                background:
-                  checkpointBonus > 0
-                    ? "linear-gradient(135deg, #c8e6c9 0%, #a5d6a7 100%)"
-                    : "linear-gradient(135deg, #fff3cd 0%, #ffe082 100%)",
-                border: `2px solid ${
-                  checkpointBonus > 0 ? "#4CAF50" : "#ff9800"
-                }`,
-                color: checkpointBonus > 0 ? "#2e7d32" : "#f57c00",
-              }}
-            >
-              {currentSemester === 2 ? (
-                checkpointBonus > 0 ? (
-                  <>
-                    🎉 Excellent Teaching! +{checkpointBonus} bonus points
-                    earned!
-                  </>
-                ) : (
-                  <>
-                    📚 Goal was 300+ points (you had{" "}
-                    {Math.round(calculateStudentLearning())}). Keep teaching!
-                  </>
-                )
-              ) : (
-                <>Checkpoint reached! Keep going!</>
-              )}
-            </div>
-
-            {/* Tips for remainder */}
-            <div
-              style={{
-                marginBottom: "20px",
-                padding: "15px",
-                background: "#f5f5f5",
-                borderRadius: "6px",
-                fontSize: "14px",
-                color: "#666",
-                textAlign: "left",
-              }}
-            >
-              <strong>Tips for the rest of the semester:</strong>
-              <ul style={{ margin: "10px 0 0 20px", lineHeight: "1.6" }}>
-                <li>
-                  You have about {getCheckpointMinutes()} minutes remaining
-                </li>
-                <li>Focus on accuracy - every point counts!</li>
-                <li>
-                  Research multiplies everything, Engagement compounds over time
-                </li>
-                <li>Materials give direct points - use them strategically</li>
-              </ul>
-            </div>
-
-            {/* Continue button */}
-            <button
-              onClick={() => {
-                setIsInBreak(false);
-                setBreakDestination(null);
-              }}
-              style={{
-                padding: "12px 35px",
-                background: "#2196F3",
-                color: "white",
-                border: "none",
-                borderRadius: "6px",
-                fontSize: "16px",
-                fontWeight: "bold",
-                cursor: "pointer",
-                boxShadow: "0 3px 6px rgba(0,0,0,0.15)",
-                transition: "all 0.3s",
-              }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.transform = "translateY(-2px)";
-                e.currentTarget.style.boxShadow = "0 5px 10px rgba(0,0,0,0.2)";
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.transform = "translateY(0)";
-                e.currentTarget.style.boxShadow = "0 3px 6px rgba(0,0,0,0.15)";
-              }}
-            >
-              Continue Teaching →
-            </button>
-
-            <p
-              style={{
-                marginTop: "10px",
-                color: "#999",
-                fontSize: "12px",
-              }}
-            >
-              The timer is paused. Click to continue when ready.
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* Game blocked overlay */}
-      {gameBlocked && (
-        <div
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            width: "100%",
-            height: "100%",
-            background: "rgba(0, 0, 0, 0.9)",
-            zIndex: 999999,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <div
-            style={{
-              background: "white",
-              padding: "40px",
-              borderRadius: "10px",
-              textAlign: "center",
-              maxWidth: "500px",
-            }}
-          >
-            <h2 style={{ color: "#f44336", marginBottom: "20px" }}>
-              Session Ended
-            </h2>
-            <p style={{ marginBottom: "30px" }}>
-              Your session has been terminated due to inactivity or switching
-              away from the game.
-            </p>
-            <p style={{ color: "#c62828", fontWeight: "bold" }}>
-              You cannot restart. This was your only attempt.
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* Out of focus warning */}
-      {isOutOfFocus && (
-        <div
-          style={{
-            position: "fixed",
-            top: "20px",
-            right: "20px",
-            background: "#ff9800",
-            color: "white",
-            padding: "15px 20px",
-            borderRadius: "8px",
-            zIndex: 10000,
-            boxShadow: "0 4px 6px rgba(0,0,0,0.1)",
-          }}
-        >
-          <strong>⚠️ Focus Warning</strong>
-          <br />
-          Game will be blocked in {outOfFocusCountdown} seconds
-        </div>
-      )}
-
-      {/* Idle warning - DISABLED */}
-      {/* {isIdle && (
-        <div
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            width: "100%",
-            height: "100%",
-            background: "rgba(0, 0, 0, 0.7)",
-            zIndex: 10000,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <div
-            style={{
-              background: "white",
-              padding: "30px",
-              borderRadius: "10px",
-              textAlign: "center",
-              maxWidth: "400px",
-            }}
-          >
-            <h3 style={{ color: "#ff9800", marginBottom: "15px" }}>
-              Are you still there?
-            </h3>
-            <p style={{ marginBottom: "20px" }}>
-              Auto-closing in {idleCountdown} seconds due to inactivity
-            </p>
-            <button
-              onClick={() => {
-                setIsIdle(false);
-                setIdleCountdown(5);
-                lastActivityRef.current = Date.now();
-              }}
-              style={{
-                padding: "10px 20px",
-                background: "#4CAF50",
-                color: "white",
-                border: "none",
-                borderRadius: "6px",
-                cursor: "pointer",
-              }}
-            >
-              Continue Playing
-            </button>
-          </div>
-        </div>
-      )} */}
-
-      <div style={{ padding: "20px", maxWidth: "1400px", margin: "0 auto" }}>
-        <h1 style={{ marginBottom: "30px", textAlign: "center" }}>
-          Can you beat Park? - Semester {currentSemester}/{totalSemesters}
-        </h1>
-
-        {/* Use NavTabsEnhanced with updated category names */}
-        <NavTabsEnhanced
-          current={currentTab}
-          completed={completed}
-          onSwitch={handleTabSwitch}
-          limitMode="time"
-          taskPoints={taskPoints}
-          categoryMultipliers={{}}
-          starGoals={{}}
-          categoryPoints={categoryPoints}
-          timeRemaining={timeRemaining}
-        />
-
-        {/* Side-by-side layout: Game + Chat */}
-        <div
-          style={{
-            display: "flex",
-            gap: "20px",
-            alignItems: "stretch",
-            marginTop: "20px",
-            minHeight: "650px",
-            width: "100%",
-          }}
-        >
-          {/* Game area - 2/3 width */}
-          <div
-            style={{
-              flex: "0 0 66.666%",
-              minHeight: "650px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              background: "white",
-              borderRadius: "8px",
-              border: "1px solid #e0e0e0",
-              overflow: "visible",
-            }}
-          >
-            <div
-              className="task-container"
-              style={{
-                width: "100%",
-                minHeight: "650px",
-                padding: "20px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                overflow: "visible",
-              }}
-            >
-              {renderTask()}
-            </div>
-          </div>
-
-          {/* Chat area - 1/3 width */}
-          <div
-            style={{
-              flex: "0 0 33.333%",
-              background: "white",
-              borderRadius: "8px",
-              border: "1px solid #e0e0e0",
-              overflow: "visible" /* Changed from hidden to visible */,
-              height: "680px" /* Increased height slightly */,
-              display: "flex",
-              flexDirection: "column",
-            }}
-          >
-            <ChatContainer
-              bonusPrompts={bonusPrompts}
-              currentTask={currentTab}
-              categoryPoints={categoryPoints}
-              categoryMultipliers={{}}
-              starGoals={{}}
-              timeRemaining={timeRemaining}
-              calculateStudentLearning={calculateStudentLearning}
-              onAIHelp={(helpData) => {
-                // Pass AI help to the current task
-                window.dispatchEvent(
-                  new CustomEvent("aiHelp", { detail: helpData })
-                );
-              }}
-            />
-          </div>
-        </div>
-      </div>
+       <TaskRunnerLayout
+         currentTaskIndex={currentTaskIndex}
+         totalTasks={taskQueue.length}
+         taskQueue={taskQueue}
+         onSwitchTask={handleSwitchTask}
+         points={Math.round(studentLearningScore)}
+         timeRemaining={timeRemaining}
+         onTimeUp={() => handleGameComplete("time_up")}
+       >
+         {renderTask()}
+       </TaskRunnerLayout>
+       
+       {/* Hidden ChatContainer for logic if needed? No, it's UI. */}
+       <div style={{ display: 'none' }}>
+         {/* We might need this if tasks dispatch events to it? */}
+       </div>
     </div>
   );
+
 }
 
 export default App;
