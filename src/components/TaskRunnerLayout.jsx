@@ -35,7 +35,7 @@ export default function TaskRunnerLayout({
   const completedCount = currentTaskIndex;
   
   return (
-    <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '20px' }}>
+    <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '20px' }}>
       {/* Header */}
       <div style={{
         display: 'flex',
@@ -49,14 +49,6 @@ export default function TaskRunnerLayout({
       }}>
         {/* Left: Timer */}
         <div style={{ width: '200px' }}>
-           {/* Timer is now passed in or handled globally, but we can render a simple display here if GameTimer is fixed position. 
-               Actually, the requirement said "Timer to the right (top?)". 
-               Let's put it in the header for cleaner UI. 
-               If GameTimer is fixed, we might need to adjust it or wrap it.
-               For now, let's assume GameTimer handles its own rendering if we don't pass a container, 
-               but here we want it integrated. 
-               Let's render a custom timer display here using the prop.
-           */}
            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
              <span style={{ fontSize: '24px' }}>⏱️</span>
              <div>
@@ -89,33 +81,15 @@ export default function TaskRunnerLayout({
         </div>
       </div>
 
-      {/* Main Content Area */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: '20px' }}>
+      {/* Main Content Area - 3 Column Grid */}
+      <div style={{ 
+        display: 'grid', 
+        gridTemplateColumns: '280px 1fr 320px', 
+        gap: '20px',
+        alignItems: 'start' 
+      }}>
         
-        {/* Task Area */}
-        <div style={{ 
-          background: 'white', 
-          borderRadius: '12px', 
-          padding: '20px',
-          boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
-          minHeight: '500px'
-        }}>
-          <div style={{ 
-            marginBottom: '20px', 
-            paddingBottom: '15px', 
-            borderBottom: '1px solid #eee',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px'
-          }}>
-            <span style={{ fontSize: '24px' }}>{currentInfo.icon}</span>
-            <h2 style={{ margin: 0, color: currentInfo.color }}>Current: {currentInfo.name}</h2>
-          </div>
-          
-          {children}
-        </div>
-
-        {/* Sidebar: Switching Controls */}
+        {/* Left Column: Switching Controls */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
           <div style={{ 
             background: 'white', 
@@ -158,7 +132,7 @@ export default function TaskRunnerLayout({
             </div>
           </div>
           
-          {/* Queue Preview (Optional, helpful for debugging/transparency) */}
+          {/* Queue Preview */}
           <div style={{ 
             background: '#f8f9fa', 
             padding: '15px', 
@@ -182,14 +156,43 @@ export default function TaskRunnerLayout({
               {remainingQueue.length > 5 && <span>+{remainingQueue.length - 5} more</span>}
             </div>
           </div>
+        </div>
 
-          {/* AI Chat Interface */}
+        {/* Center Column: Task Area */}
+        <div style={{ 
+          background: 'white', 
+          borderRadius: '12px', 
+          padding: '20px',
+          boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
+          minHeight: '500px'
+        }}>
+          <div style={{ 
+            marginBottom: '20px', 
+            paddingBottom: '15px', 
+            borderBottom: '1px solid #eee',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px'
+          }}>
+            <span style={{ fontSize: '24px' }}>{currentInfo.icon}</span>
+            <h2 style={{ margin: 0, color: currentInfo.color }}>Current: {currentInfo.name}</h2>
+          </div>
+          
+          {children}
+        </div>
+
+        {/* Right Column: AI Chat Interface */}
+        <div>
           {chatInterface && (
-            <div style={{ marginTop: '20px' }}>
+            <div style={{ 
+              position: 'sticky',
+              top: '20px'
+            }}>
               {chatInterface}
             </div>
           )}
         </div>
+
       </div>
       
       <style>{`
