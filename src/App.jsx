@@ -92,8 +92,8 @@ function App() {
   });
 
   // NEW: Teaching simulation states
-  const [timeLimit, setTimeLimit] = useState(1200); // Default 20 min
-  const [timeRemaining, setTimeRemaining] = useState(1200);
+  const [timeLimit, setTimeLimit] = useState(720); // Default 12 min
+  const [timeRemaining, setTimeRemaining] = useState(720);
   const [studentLearningScore, setStudentLearningScore] = useState(0);
   const [categoryPoints, setCategoryPoints] = useState({
     materials: 0, // Renamed from slider
@@ -124,13 +124,13 @@ function App() {
   const outOfFocusTimerRef = useRef(null);
   const idleTimerRef = useRef(null);
   const lastActivityRef = useRef(Date.now());
-  const timeRemainingRef = useRef(1200);
-  const timeLimitRef = useRef(1200);
+  const timeRemainingRef = useRef(720);
+  const timeLimitRef = useRef(720);
 
   // Helper function to get checkpoint timing for display
   const getCheckpointMinutes = () => {
     const config = JSON.parse(sessionStorage.getItem("gameConfig") || "{}");
-    const semesterDurationMs = config.semesterDuration || 1200000; // Default 20 minutes
+    const semesterDurationMs = config.semesterDuration || 720000; // Default 12 minutes
     const checkpointTimeSeconds = Math.floor(semesterDurationMs / 2000); // Half duration in seconds
     return Math.floor(checkpointTimeSeconds / 60); // Convert to minutes for display
   };
@@ -542,7 +542,7 @@ function App() {
 
   const startTimer = () => {
     const config = JSON.parse(sessionStorage.getItem("gameConfig") || "{}");
-    const duration = config.semesterDuration || 1200000;
+    const duration = config.semesterDuration || 720000;
     const limitInSeconds = Math.floor(duration / 1000);
 
     setTimeLimit(limitInSeconds);
@@ -578,7 +578,7 @@ function App() {
 
       if (checkpointEnabled) {
         // Dynamic checkpoint time: semester duration / 2
-        const semesterDurationMs = config.semesterDuration || 1200000; // Default 20 minutes
+        const semesterDurationMs = config.semesterDuration || 720000; // Default 12 minutes
         const checkpointTime = Math.floor(semesterDurationMs / 2000); // Half duration in seconds
 
         if (elapsedSeconds === checkpointTime && !checkpointReached) {
@@ -2702,14 +2702,18 @@ function App() {
          points={Math.round(studentLearningScore)}
          timeRemaining={timeRemaining}
          onTimeUp={() => handleGameComplete("time_up")}
+         chatInterface={
+           <ChatContainer
+             bonusPrompts={bonusPrompts}
+             currentTask={currentTab}
+             categoryPoints={categoryPoints}
+             timeRemaining={timeRemaining}
+             calculateStudentLearning={calculateStudentLearning}
+           />
+         }
        >
          {renderTask()}
        </TaskRunnerLayout>
-       
-       {/* Hidden ChatContainer for logic if needed? No, it's UI. */}
-       <div style={{ display: 'none' }}>
-         {/* We might need this if tasks dispatch events to it? */}
-       </div>
     </div>
   );
 

@@ -9,7 +9,8 @@ export default function TaskRunnerLayout({
   children,
   points,
   timeRemaining,
-  onTimeUp
+  onTimeUp,
+  chatInterface
 }) {
   const currentTaskType = taskQueue[currentTaskIndex];
   
@@ -182,6 +183,12 @@ export default function TaskRunnerLayout({
             </div>
           </div>
 
+          {/* AI Chat Interface */}
+          {chatInterface && (
+            <div style={{ marginTop: '20px' }}>
+              {chatInterface}
+            </div>
+          )}
         </div>
       </div>
       

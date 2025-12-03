@@ -87,7 +87,7 @@ export default function TaskAllocationScreen({ onStart }) {
       </h1>
 
       <div style={{ marginBottom: '30px', lineHeight: '1.6', color: '#555' }}>
-        <p>You have <strong>15 minutes</strong> to complete <strong>10 tasks</strong>.</p>
+        <p>You have <strong>12 minutes</strong> to complete <strong>10 tasks</strong>.</p>
         <p>You must decide now how many of each task type you want to perform.</p>
         <p>Total tasks must add up to <strong>10</strong>.</p>
       </div>
