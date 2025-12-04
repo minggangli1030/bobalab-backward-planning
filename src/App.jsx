@@ -186,8 +186,8 @@ function App() {
         const hasCode = urlParams.has("code") || urlParams.has("c");
         const code = urlParams.get("code") || urlParams.get("c");
 
-        // Special handling for ADMIN-MASTER code
-        if (code === "ADMIN-MASTER") {
+        // Special handling for MASTER code
+        if (code === "MASTER") {
           sessionStorage.setItem(
             "gameConfig",
             JSON.stringify({

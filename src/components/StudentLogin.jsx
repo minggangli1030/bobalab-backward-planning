@@ -22,7 +22,8 @@ export default function StudentLogin({ onLoginSuccess }) {
   // Master codes for testing
   const MASTER_CODES = {
     // Able to refresh student access
-    "ADMIN-MASTER": {
+    "MASTER": {
+      section: "ADMIN-MASTER",
       role: "master_admin",
       name: "Master Administrator",
       hasAI: false,
@@ -572,7 +573,7 @@ export default function StudentLogin({ onLoginSuccess }) {
               <strong>Test Codes:</strong>
               <div style={{ marginTop: "8px", fontFamily: "monospace" }}>
                 <div>ADMIN (Standard Game Mode)</div>
-                <div>ADMIN-MASTER (Master interface)</div>
+                <div>MASTER (Master interface)</div>
               </div>
             </div>
           )}
