@@ -2773,7 +2773,6 @@ function App() {
          totalTasks={taskQueue.length}
          taskQueue={taskQueue}
          onSwitchTask={handleSwitchTask}
-         onRefill={handleRefillJar}
          allocationCounts={allocationCounts}
          points={Math.round(studentLearningScore)}
          timeRemaining={timeRemaining}
