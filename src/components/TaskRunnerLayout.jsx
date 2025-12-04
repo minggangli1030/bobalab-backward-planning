@@ -231,7 +231,9 @@ export default function TaskRunnerLayout({
           borderRadius: '12px', 
           boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
           display: 'flex',
-          flexDirection: 'column'
+          flexDirection: 'column',
+          height: 'fit-content', // Prevent stretching
+          maxHeight: '100%'
         }}>
           <h3 style={{ margin: '0 0 15px 0', fontSize: '16px', color: '#666', textAlign: 'center' }}>Task Jars</h3>
           

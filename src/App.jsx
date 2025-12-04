@@ -1039,11 +1039,10 @@ function App() {
     } else {
       // Queue finished!
       // Check time
-      if (timeRemaining > 0) {
-        setMode("bonus_round");
-      } else {
-        handleGameComplete("all_tasks_done");
-      }
+      // Queue finished!
+      // Check time
+      // End game immediately (No bonus round)
+      handleGameComplete("all_tasks_done");
     }
   };
 
@@ -1413,8 +1412,33 @@ function App() {
           <div style={{ marginTop: "30px" }}>
             <button
               onClick={() => {
-                // Start the next semester
-                setMode("challenge");
+                // Reset for next semester
+                setCurrentSemester((prev) => prev + 1);
+                setMode("allocation"); // Go to allocation screen instead of challenge
+                // Reset timer? Or keep cumulative? Usually reset for new semester.
+                // The allocation screen will call onStart which resets things.
+
+                // We need to ensure TaskAllocationScreen handles the "Start Semester X" correctly.
+                // It calls onStart, which sets mode to challenge.
+
+                // Reset state for new semester
+                setCompleted({});
+                setTaskQueue([]);
+                setCurrentTaskIndex(0);
+                setStudentLearningScore(0); // Reset score? Or keep cumulative? Usually reset or keep?
+                // User said "reassign number for each task", implying a fresh start for the semester's tasks.
+
+                // If we want to keep cumulative score, we should store it before resetting.
+                // But `studentLearningScore` is current semester score usually.
+                // `semesterHistory` tracks past scores.
+
+                // Reset category points
+                setCategoryPoints({
+                  materials: 0,
+                  research: 0,
+                  engagement: 0,
+                  bonus: 0,
+                });
                 startTimer();
                 setTaskStartTimes({ g2t1: Date.now() });
                 eventTracker.setPageStartTime("g2t1");
@@ -2765,54 +2789,109 @@ function App() {
     );
   }
 
-  // Default: Challenge Mode (Task Runner)
-  return (
-    <div className="app">
-       <TaskRunnerLayout
-         currentTaskIndex={currentTaskIndex}
-         totalTasks={taskQueue.length}
-         taskQueue={taskQueue}
-         onSwitchTask={handleSwitchTask}
-         allocationCounts={allocationCounts}
-         points={Math.round(studentLearningScore)}
-         timeRemaining={timeRemaining}
-         onTimeUp={() => handleGameComplete("time_up")}
-         chatInterface={
-           <ChatContainer
-             bonusPrompts={bonusPrompts}
-             currentTask={currentTab}
-             categoryPoints={categoryPoints}
-             timeRemaining={timeRemaining}
-             calculateStudentLearning={calculateStudentLearning}
-             aiCost={globalConfig.aiCost}
-             onAiCost={(cost) => {
-               // Deduct points for AI usage? 
-               // Or just track it? The request says "Include penalty for AI".
-               // Usually penalties are deducted from final score or current score.
-               // Let's deduct from 'bonus' category for now to keep it simple, or add a 'penalties' category.
-               // Actually, let's just subtract from student learning score calculation if possible, 
-               // or better, track it in a separate state and subtract at the end.
-               // For visibility, let's subtract from 'bonus' (can go negative) or create a 'penalty' state.
-               
-               // Let's add a 'penalty' field to categoryPoints?
-               // Or just update studentLearningScore directly? No, that's calculated.
-               // Let's use a new state for penalties.
-               // Wait, I can't easily add state here without re-rendering everything.
-               // Let's just subtract from 'bonus' for now, effectively reducing the score.
-               setCategoryPoints(prev => ({
-                 ...prev,
-                 bonus: (prev.bonus || 0) - cost
-               }));
-               showNotification(`AI Usage Penalty: -${cost} pts`);
-             }}
-           />
-         }
-       >
-         {renderTask()}
-       </TaskRunnerLayout>
-    </div>
-  );
+   // Handle Refill Logic
+  const handleRefillJar = (type) => {
+    // 1. Check if frozen
+    if (globalConfig.jarRefillFreezeTime > 0) {
+      setGameBlocked(true);
+      setAccessDeniedReason(`Refilling ${type === 'g1' ? 'Research' : type === 'g2' ? 'Materials' : 'Engagement'} Jar...`);
+      
+      setTimeout(() => {
+        setGameBlocked(false);
+        setAccessDeniedReason("");
+        addTasksToQueue(type, 3); // Add 3 tasks
+      }, globalConfig.jarRefillFreezeTime * 1000);
+    } else {
+      addTasksToQueue(type, 3);
+    }
+  };
 
+  const addTasksToQueue = (type, count) => {
+    // Generate new task IDs
+    // We need to know the last ID used for this type to increment
+    // Or just random/sequential. Let's use sequential based on existing queue + completed?
+    // Simplified: just append new IDs.
+    
+    // We need to find the max ID for this type currently in queue or completed
+    // This is a bit complex to track perfectly without a counter state.
+    // Let's just use a timestamp-based or simple increment if possible.
+    // Actually, let's just assume we continue from where we left off? 
+    // But we don't track "next available ID" easily.
+    // Let's just use a random difficulty distribution for the new tasks?
+    // User didn't specify difficulty for refill. Let's assume balanced or random.
+    
+    const newTasks = [];
+    for (let i = 0; i < count; i++) {
+        // For now, just use a generic ID format or random difficulty
+        // Let's say we just add "refill" tasks.
+        // We need valid IDs like g1t1, g1t2 etc for the components to work?
+        // The components take `taskNum`.
+        // Let's generate random taskNum between 1 and 100 to avoid collisions/caching issues if any
+        const taskNum = Math.floor(Math.random() * 20) + 1; 
+        newTasks.push(`${type}t${taskNum}`);
+    }
+    
+    setTaskQueue(prev => [...prev, ...newTasks]);
+  };
+
+  // Render Task Runner
+  if (mode === "challenge" || mode === "bonus_round") {
+    // ... (existing checks)
+
+    return (
+      <div className="app">
+        {gameBlocked && (
+            <div style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                background: 'rgba(0,0,0,0.7)',
+                zIndex: 9999,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'white',
+                fontSize: '24px',
+                flexDirection: 'column',
+                gap: '20px'
+            }}>
+                <div style={{ fontSize: '48px' }}>⏳</div>
+                <div>{accessDeniedReason}</div>
+                <div style={{ fontSize: '16px', opacity: 0.8 }}>Please wait...</div>
+            </div>
+        )}
+      
+        <TaskRunnerLayout
+          currentTaskIndex={currentTaskIndex}
+          totalTasks={taskQueue.length}
+          taskQueue={taskQueue}
+          onSwitchTask={handleSwitchTask}
+          onRefill={handleRefillJar}
+          allocationCounts={allocationCounts}
+          points={Math.round(studentLearningScore)}
+          timeRemaining={timeRemaining}
+          onTimeUp={() => handleGameComplete("time_up")}
+          chatInterface={
+            <ChatContainer
+              messages={chatMessages}
+              onSendMessage={handleSendMessage}
+              isAiTyping={isAiTyping}
+              isOpen={isChatOpen}
+              onToggle={() => setIsChatOpen(!isChatOpen)}
+              unreadCount={unreadCount}
+              aiDelay={globalConfig.aiDelay}
+            />
+          }
+        >
+          {renderTask()}
+        </TaskRunnerLayout>
+      </div>
+    );
+
+
+  }
 }
 
 export default App;
