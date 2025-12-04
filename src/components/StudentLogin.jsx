@@ -19,7 +19,7 @@ export default function StudentLogin({ onLoginSuccess }) {
   };
   */
 
-  // Master codes for testing - with new experimental conditions
+  // Master codes for testing
   const MASTER_CODES = {
     // Able to refresh student access
     "ADMIN-MASTER": {
@@ -29,62 +29,13 @@ export default function StudentLogin({ onLoginSuccess }) {
       isMasterInterface: true,
     },
 
-    // Internal testing codes - like student mode but with infinite attempts
-    ...Array.from({ length: 10 }, (_, i) => ({
-      [`ADMIN-TEST${i + 1}`]: {
-        role: "test",
-        semesterDuration: 720000, // 12 min like students
-        name: `Test User ${i + 1}`,
-        hasAI: true,
-        checkpointSemester2: true,
-        isTestCode: true,
-      },
-    })).reduce((acc, obj) => ({ ...acc, ...obj }), {}),
-
-    // Original admin codes (kept the same)
-    "ADMIN-REGULAR": {
+    // Standard Admin Mode
+    "ADMIN": {
       role: "admin",
       semesterDuration: 720000, // 12 min
-      name: "Admin Regular Mode",
+      name: "Admin User",
       hasAI: true,
       checkpointSemester2: true,
-    },
-    "ADMIN-FAST": {
-      role: "admin",
-      semesterDuration: 120000, // 2 minutes
-      name: "Admin Fast Mode",
-      hasAI: true,
-      checkpointSemester2: true,
-    },
-
-    // New experimental admin codes
-    "ADMIN-1-CP": {
-      role: "admin",
-      semesterDuration: 120000, // 2 minutes for testing
-      name: "Admin Section 1 WITH Checkpoint",
-      hasAI: false, // Section 01A - no AI
-      checkpointSemester2: true,
-    },
-    "ADMIN-1-NCP": {
-      role: "admin",
-      semesterDuration: 120000, // 2 minutes for testing
-      name: "Admin Section 1 NO Checkpoint",
-      hasAI: false, // Section 01A - no AI
-      checkpointSemester2: false,
-    },
-    "ADMIN-2-CP": {
-      role: "admin",
-      semesterDuration: 120000, // 2 minutes for testing
-      name: "Admin Section 2 WITH Checkpoint",
-      hasAI: true, // Section 02A - AI available
-      checkpointSemester2: true,
-    },
-    "ADMIN-2-NCP": {
-      role: "admin",
-      semesterDuration: 120000, // 2 minutes for testing
-      name: "Admin Section 2 NO Checkpoint",
-      hasAI: true, // Section 02A - AI available
-      checkpointSemester2: false,
     },
   };
 
@@ -620,13 +571,7 @@ export default function StudentLogin({ onLoginSuccess }) {
             >
               <strong>Test Codes:</strong>
               <div style={{ marginTop: "8px", fontFamily: "monospace" }}>
-                <div>ADMIN-TEST1 to ADMIN-TEST10 (Test users)</div>
-                <div>ADMIN-1-CP (No AI, With Checkpoint)</div>
-                <div>ADMIN-1-NCP (No AI, No Checkpoint)</div>
-                <div>ADMIN-2-CP (AI, With Checkpoint)</div>
-                <div>ADMIN-2-NCP (AI, No Checkpoint)</div>
-                <div>ADMIN-REGULAR (Original)</div>
-                <div>ADMIN-FAST (2 min test)</div>
+                <div>ADMIN (Standard Game Mode)</div>
                 <div>ADMIN-MASTER (Master interface)</div>
               </div>
             </div>

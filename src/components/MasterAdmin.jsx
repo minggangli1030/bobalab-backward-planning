@@ -662,27 +662,7 @@ export default function MasterAdmin() {
             gap: "20px",
           }}
         >
-          {/* Test Codes */}
-          <div
-            style={{
-              border: "2px solid #4CAF50",
-              borderRadius: "8px",
-              padding: "15px",
-              background: "#f8fff8",
-            }}
-          >
-            <h3 style={{ margin: "0 0 10px 0", color: "#4CAF50", fontSize: "16px" }}>
-              🧪 Test Codes (Internal Use)
-            </h3>
-            <ul style={{ margin: 0, paddingLeft: "20px", fontSize: "14px" }}>
-              <li><code>ADMIN-TEST1</code> to <code>ADMIN-TEST10</code></li>
-              <li>Student-like experience with infinite attempts</li>
-              <li>12-minute duration, AI enabled, checkpoints</li>
-              <li>Data tracked like regular students</li>
-            </ul>
-          </div>
-
-          {/* Regular Admin Codes */}
+          {/* Regular Admin */}
           <div
             style={{
               border: "2px solid #2196F3",
@@ -692,15 +672,13 @@ export default function MasterAdmin() {
             }}
           >
             <h3 style={{ margin: "0 0 10px 0", color: "#2196F3", fontSize: "16px" }}>
-              ⚙️ Admin Codes (Testing)
+              ⚙️ Admin Access
             </h3>
             <ul style={{ margin: 0, paddingLeft: "20px", fontSize: "14px" }}>
-              <li><code>ADMIN-REGULAR</code> - Standard 12min, AI enabled</li>
-              <li><code>ADMIN-FAST</code> - Quick 2min test mode</li>
-              <li><code>ADMIN-1-CP</code> - No AI, with checkpoint</li>
-              <li><code>ADMIN-1-NCP</code> - No AI, no checkpoint</li>
-              <li><code>ADMIN-2-CP</code> - AI enabled, with checkpoint</li>
-              <li><code>ADMIN-2-NCP</code> - AI enabled, no checkpoint</li>
+              <li><code>ADMIN</code> - Standard Game Mode</li>
+              <li>12-minute duration (configurable)</li>
+              <li>AI enabled</li>
+              <li>Data tracked separately</li>
             </ul>
           </div>
 
