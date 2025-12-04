@@ -504,7 +504,7 @@ function App() {
   if (window.location.search.includes("master=true")) {
     const config = JSON.parse(sessionStorage.getItem("gameConfig") || "{}");
     if (config.role === "master_admin") {
-      return <MasterAdmin />;
+      return <MasterAdmin onClose={() => setMode("landing")} />;
     }
   }
 
