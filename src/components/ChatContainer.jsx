@@ -830,79 +830,8 @@ Typing: "${help.text.substring(
       setIsLoading(false);
       setProgress(0);
     }
-  };    return;
-        } else if (
-          userMessage.includes("research") ||
-          userMessage.includes("count")
-        ) {
-          setIsTyping(false);
-          return;
-        } else if (
-          userMessage.includes("engagement") ||
-          userMessage.includes("typ")
-        ) {
-          handleSmartHelp("engagement");
-          setIsTyping(false);
-          return;
-        } else {
-          response = "Click the help buttons below for task assistance!";
-        }
-      } else if (
-        userMessage.includes("strategy") ||
-        userMessage.includes("plan") ||
-        userMessage.includes("order")
-      ) {
-        responseType = "strategy";
-        const planningResponses = [
-          "🎯 CRITICAL STRATEGY: Do tasks in this EXACT order → 1️⃣ Engagement (builds interest from the start) 2️⃣ Research (multiplies future materials) 3️⃣ Materials (gets all multipliers). Materials done early = WASTED points!",
-          "📊 MAXIMUM SCORE ORDER: Engagement FIRST → Research SECOND → Materials LAST! Why? Engagement compounds every task, Research only multiplies FUTURE materials. Doing materials early gets ZERO multiplier!",
-          "⚠️ WARNING: Research multipliers ONLY apply to materials earned AFTER! If you do materials first, you get NO bonus. Always do ALL engagement & research before touching ANY materials!",
-          "💡 PRO TIP: Complete 100% of Engagement tasks first (builds interest early), then 100% of Research (sets up multipliers), THEN do Materials. This order can DOUBLE your score vs doing materials first!",
-          "🚀 OPTIMAL PATH: Think of it like this - Engagement = compound interest (starts early), Research = multiplier (affects future only), Materials = base score (save for last). Wrong order = lost points forever!",
-        ];
-        response =
-          planningResponses[
-            Math.floor(Math.random() * planningResponses.length)
-          ];
-      } else if (
-        userMessage.includes("tip") ||
-        userMessage.includes("advice")
-      ) {
-        responseType = "advice";
-        response =
-          "Strategic tip: Do Research tasks first for the multiplier effect, then Materials for base points, finally Engagement for compound interest!";
-      } else {
-        const genericResponses = [
-          "Keep pushing! You're doing great!",
-          "Remember: Materials × Research × Engagement = Success!",
-          "Focus on accuracy for those 2-point rewards!",
-          `The checkpoint at minute ${(() => {
-            const config = JSON.parse(sessionStorage.getItem("gameConfig") || "{}");
-            const semesterDurationMs = config.semesterDuration || 1200000;
-            const checkpointTimeSeconds = Math.floor(semesterDurationMs / 2000);
-            return Math.floor(checkpointTimeSeconds / 60);
-          })()} can give huge bonuses!`,
-          "Try the help buttons below for task assistance!",
-        ];
-        response =
-          genericResponses[Math.floor(Math.random() * genericResponses.length)];
-      }
-
-      // Track chat interaction
-      eventTracker.trackUserAction("chat_message", {
-        query: fullQuery,
-        queryType: responseType,
-        response: response,
-        currentTask: currentTask,
-        categoryPoints: categoryPoints,
-        studentLearning: calculateStudentLearning(),
-        aiUsageCount: aiTaskHelper.totalAIUsage,
-      });
-
-      setMessages((prev) => [...prev, { sender: "bot", text: response }]);
-      setIsTyping(false);
-    }, 800);
   };
+
 
   const currentGameType = getCurrentGameType();
 
@@ -1193,4 +1122,6 @@ Typing: "${help.text.substring(
       )}
     </div>
   );
+}
+}
 }
