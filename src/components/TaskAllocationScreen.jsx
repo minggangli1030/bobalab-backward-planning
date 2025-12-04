@@ -1,15 +1,24 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 export default function TaskAllocationScreen({ 
   onStart, 
   totalTasks = 10, 
-  orderStrategy = "sequential",
-  durationMinutes = 12
+  orderStrategy = "sequential_task",
+  durationMinutes = 12,
+  difficultyMode = "fixed" // 'fixed' or 'manual'
 }) {
-  const [allocation, setAllocation] = useState({
-    g2: 0, // Materials (was slider)
-    g1: 0, // Research (was counting)
-    g3: 0, // Engagement (was typing)
+  // State for Fixed Mode (Simple counts)
+  const [simpleAllocation, setSimpleAllocation] = useState({
+    g2: 0, // Materials
+    g1: 0, // Research
+    g3: 0, // Engagement
+  });
+
+  // State for Manual Mode (Detailed counts)
+  const [manualAllocation, setManualAllocation] = useState({
+    g2: { easy: 0, medium: 0, hard: 0 },
+    g1: { easy: 0, medium: 0, hard: 0 },
+    g3: { easy: 0, medium: 0, hard: 0 }
   });
   
   const [aiChat, setAiChat] = useState([]);
@@ -37,16 +46,41 @@ export default function TaskAllocationScreen({
     }
   };
 
-  const handleCountChange = (taskKey, value) => {
+  // Handle Simple Allocation Change
+  const handleSimpleChange = (taskKey, value) => {
     const num = parseInt(value) || 0;
-    setAllocation(prev => ({
+    setSimpleAllocation(prev => ({
       ...prev,
       [taskKey]: Math.max(0, num)
     }));
     setError(null);
   };
 
-  const currentTotal = Object.values(allocation).reduce((a, b) => a + b, 0);
+  // Handle Manual Allocation Change
+  const handleManualChange = (taskKey, difficulty, value) => {
+    const num = parseInt(value) || 0;
+    setManualAllocation(prev => ({
+      ...prev,
+      [taskKey]: {
+        ...prev[taskKey],
+        [difficulty]: Math.max(0, num)
+      }
+    }));
+    setError(null);
+  };
+
+  // Calculate Totals
+  const getSimpleTotal = () => Object.values(simpleAllocation).reduce((a, b) => a + b, 0);
+  
+  const getManualTotal = () => {
+    let total = 0;
+    Object.values(manualAllocation).forEach(task => {
+      total += task.easy + task.medium + task.hard;
+    });
+    return total;
+  };
+
+  const currentTotal = difficultyMode === 'manual' ? getManualTotal() : getSimpleTotal();
   const isValid = currentTotal === totalTasks;
 
   const handleStart = () => {
@@ -55,40 +89,121 @@ export default function TaskAllocationScreen({
       return;
     }
 
-    // Generate task queue
-    let queue = [];
-    
-    if (orderStrategy === "random") {
-      // Create pool and shuffle
-      const pool = [
-        ...Array(allocation.g2).fill('g2'),
-        ...Array(allocation.g1).fill('g1'),
-        ...Array(allocation.g3).fill('g3')
-      ];
-      // Fisher-Yates shuffle
-      for (let i = pool.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [pool[i], pool[j]] = [pool[j], pool[i]];
-      }
-      // Assign levels
-      const counts = { g1: 0, g2: 0, g3: 0 };
-      queue = pool.map(type => {
-        counts[type]++;
-        return `${type}t${counts[type]}`;
+    let finalAllocation = []; // Array of { type: 'g2', difficulty: 'easy' } objects
+
+    if (difficultyMode === 'fixed') {
+      // Distribute 50/30/20 for each task type
+      ['g2', 'g1', 'g3'].forEach(type => {
+        const count = simpleAllocation[type];
+        if (count > 0) {
+          const easyCount = Math.round(count * 0.5);
+          const mediumCount = Math.round(count * 0.3);
+          const hardCount = count - easyCount - mediumCount;
+          
+          // Handle potential negative hard count due to rounding
+          // (e.g. count=1 -> 1, 0, 0)
+          // Adjust logic to ensure sum equals count
+          
+          // Better distribution logic:
+          // Fill Easy, then Medium, then Hard
+          let remaining = count;
+          const e = Math.ceil(count * 0.5); // Prioritize easy? Or round?
+          // Let's stick to strict rounding but adjust last bucket
+          // Actually, for small numbers, 50/30/20 is tricky.
+          // Let's use:
+          // Easy: round(0.5 * N)
+          // Medium: round(0.3 * N)
+          // Hard: Remainder
+          
+          const finalEasy = Math.max(0, Math.round(count * 0.5));
+          const finalMedium = Math.max(0, Math.round(count * 0.3));
+          const finalHard = Math.max(0, count - finalEasy - finalMedium);
+          
+          // Re-adjust if sum != count (should be handled by remainder logic, but just in case)
+          // Actually, hard could be negative if easy+medium > count.
+          // Example: count=1. Easy=1, Med=0, Hard=0. Correct.
+          // Example: count=2. Easy=1, Med=1, Hard=0. Correct.
+          // Example: count=3. Easy=2, Med=1, Hard=0. Correct.
+          
+          for(let i=0; i<finalEasy; i++) finalAllocation.push({ type, difficulty: 'easy' });
+          for(let i=0; i<finalMedium; i++) finalAllocation.push({ type, difficulty: 'medium' });
+          for(let i=0; i<finalHard; i++) finalAllocation.push({ type, difficulty: 'hard' });
+        }
       });
     } else {
-      // Sequential: Materials (g2) -> Research (g1) -> Engagement (g3)
-      for (let i = 0; i < allocation.g2; i++) queue.push(`g2t${i + 1}`);
-      for (let i = 0; i < allocation.g1; i++) queue.push(`g1t${i + 1}`);
-      for (let i = 0; i < allocation.g3; i++) queue.push(`g3t${i + 1}`);
+      // Manual Mode
+      ['g2', 'g1', 'g3'].forEach(type => {
+        const { easy, medium, hard } = manualAllocation[type];
+        for(let i=0; i<easy; i++) finalAllocation.push({ type, difficulty: 'easy' });
+        for(let i=0; i<medium; i++) finalAllocation.push({ type, difficulty: 'medium' });
+        for(let i=0; i<hard; i++) finalAllocation.push({ type, difficulty: 'hard' });
+      });
     }
 
-    onStart(queue, allocation);
+    // Generate Queue IDs based on difficulty mapping
+    // Easy: 1-5, Medium: 6-10, Hard: 11+
+    // We need to track used indices for each type/difficulty combo to ensure uniqueness if possible
+    // But actually, we just need to assign valid IDs.
+    // Let's assume we cycle through available IDs for that difficulty.
+    
+    const counters = {
+      g2: { easy: 1, medium: 6, hard: 11 },
+      g1: { easy: 1, medium: 6, hard: 11 },
+      g3: { easy: 1, medium: 6, hard: 11 }
+    };
+
+    const queueItems = finalAllocation.map(item => {
+      const { type, difficulty } = item;
+      const id = counters[type][difficulty]++;
+      return { ...item, id: `${type}t${id}` };
+    });
+
+    // Sort Queue based on Strategy
+    let sortedQueue = [];
+    
+    if (orderStrategy === 'sequential_difficulty') {
+      // Easy -> Medium -> Hard
+      // Within difficulty: Materials -> Research -> Engagement
+      const priority = { easy: 1, medium: 2, hard: 3 };
+      const typePriority = { g2: 1, g1: 2, g3: 3 };
+      
+      sortedQueue = queueItems.sort((a, b) => {
+        if (priority[a.difficulty] !== priority[b.difficulty]) {
+          return priority[a.difficulty] - priority[b.difficulty];
+        }
+        return typePriority[a.type] - typePriority[b.type];
+      });
+    } else {
+      // sequential_task (Default)
+      // Materials -> Research -> Engagement
+      // Within type: Easy -> Medium -> Hard
+      const typePriority = { g2: 1, g1: 2, g3: 3 };
+      const diffPriority = { easy: 1, medium: 2, hard: 3 };
+      
+      sortedQueue = queueItems.sort((a, b) => {
+        if (typePriority[a.type] !== typePriority[b.type]) {
+          return typePriority[a.type] - typePriority[b.type];
+        }
+        return diffPriority[a.difficulty] - diffPriority[b.difficulty];
+      });
+    }
+
+    const queueIds = sortedQueue.map(item => item.id);
+    
+    // Pass simple allocation for stats tracking if in manual mode?
+    // Or construct a summary object.
+    const summaryAllocation = difficultyMode === 'fixed' ? simpleAllocation : {
+      g2: manualAllocation.g2.easy + manualAllocation.g2.medium + manualAllocation.g2.hard,
+      g1: manualAllocation.g1.easy + manualAllocation.g1.medium + manualAllocation.g1.hard,
+      g3: manualAllocation.g3.easy + manualAllocation.g3.medium + manualAllocation.g3.hard,
+    };
+
+    onStart(queueIds, summaryAllocation);
   };
 
   return (
     <div style={{ 
-      maxWidth: '800px', 
+      maxWidth: '900px', 
       margin: '40px auto', 
       padding: '30px',
       background: 'white',
@@ -103,60 +218,110 @@ export default function TaskAllocationScreen({
         <p>You have <strong>{durationMinutes} minutes</strong> to complete <strong>{totalTasks} tasks</strong>.</p>
         <p>You must decide now how many of each task type you want to perform.</p>
         <p>Total tasks must add up to <strong>{totalTasks}</strong>.</p>
+        {difficultyMode === 'fixed' && (
+          <p style={{ fontSize: '14px', fontStyle: 'italic', color: '#666' }}>
+            * Tasks are automatically distributed as 50% Easy, 30% Medium, 20% Hard.
+          </p>
+        )}
       </div>
 
       <div style={{ 
         display: 'grid', 
-        gridTemplateColumns: '1fr 1fr', 
+        gridTemplateColumns: '2fr 1fr', 
         gap: '40px',
         marginBottom: '40px'
       }}>
         {/* Left Col: Inputs */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          <div style={inputRowStyle}>
-            <label style={labelStyle}>
-              <span style={{fontSize: '24px', marginRight: '10px'}}>🎯</span>
-              Task 1: Slider (Materials)
-            </label>
-            <input 
-              type="number" 
-              min="0" 
-              max={totalTasks}
-              value={allocation.g2}
-              onChange={(e) => handleCountChange('g2', e.target.value)}
-              style={inputStyle}
-            />
-          </div>
+          
+          {difficultyMode === 'fixed' ? (
+            // FIXED MODE INPUTS
+            <>
+              <div style={inputRowStyle}>
+                <label style={labelStyle}>
+                  <span style={{fontSize: '24px', marginRight: '10px'}}>🎯</span>
+                  Task 1: Slider (Materials)
+                </label>
+                <input 
+                  type="number" 
+                  min="0" 
+                  max={totalTasks}
+                  value={simpleAllocation.g2}
+                  onChange={(e) => handleSimpleChange('g2', e.target.value)}
+                  style={inputStyle}
+                />
+              </div>
 
-          <div style={inputRowStyle}>
-            <label style={labelStyle}>
-              <span style={{fontSize: '24px', marginRight: '10px'}}>📚</span>
-              Task 2: Counting (Research)
-            </label>
-            <input 
-              type="number" 
-              min="0" 
-              max={totalTasks}
-              value={allocation.g1}
-              onChange={(e) => handleCountChange('g1', e.target.value)}
-              style={inputStyle}
-            />
-          </div>
+              <div style={inputRowStyle}>
+                <label style={labelStyle}>
+                  <span style={{fontSize: '24px', marginRight: '10px'}}>📚</span>
+                  Task 2: Counting (Research)
+                </label>
+                <input 
+                  type="number" 
+                  min="0" 
+                  max={totalTasks}
+                  value={simpleAllocation.g1}
+                  onChange={(e) => handleSimpleChange('g1', e.target.value)}
+                  style={inputStyle}
+                />
+              </div>
 
-          <div style={inputRowStyle}>
-            <label style={labelStyle}>
-              <span style={{fontSize: '24px', marginRight: '10px'}}>✉️</span>
-              Task 3: Typing (Engagement)
-            </label>
-            <input 
-              type="number" 
-              min="0" 
-              max={totalTasks}
-              value={allocation.g3}
-              onChange={(e) => handleCountChange('g3', e.target.value)}
-              style={inputStyle}
-            />
-          </div>
+              <div style={inputRowStyle}>
+                <label style={labelStyle}>
+                  <span style={{fontSize: '24px', marginRight: '10px'}}>✉️</span>
+                  Task 3: Typing (Engagement)
+                </label>
+                <input 
+                  type="number" 
+                  min="0" 
+                  max={totalTasks}
+                  value={simpleAllocation.g3}
+                  onChange={(e) => handleSimpleChange('g3', e.target.value)}
+                  style={inputStyle}
+                />
+              </div>
+            </>
+          ) : (
+            // MANUAL MODE INPUTS (9 Jars)
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+              {/* Materials */}
+              <div style={manualGroupStyle}>
+                <div style={{ fontWeight: 'bold', marginBottom: '10px', display: 'flex', alignItems: 'center' }}>
+                  <span style={{fontSize: '20px', marginRight: '10px'}}>🎯</span> Materials (Slider)
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
+                  <ManualInput label="Easy" value={manualAllocation.g2.easy} onChange={(v) => handleManualChange('g2', 'easy', v)} />
+                  <ManualInput label="Medium" value={manualAllocation.g2.medium} onChange={(v) => handleManualChange('g2', 'medium', v)} />
+                  <ManualInput label="Hard" value={manualAllocation.g2.hard} onChange={(v) => handleManualChange('g2', 'hard', v)} />
+                </div>
+              </div>
+
+              {/* Research */}
+              <div style={manualGroupStyle}>
+                <div style={{ fontWeight: 'bold', marginBottom: '10px', display: 'flex', alignItems: 'center' }}>
+                  <span style={{fontSize: '20px', marginRight: '10px'}}>📚</span> Research (Counting)
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
+                  <ManualInput label="Easy" value={manualAllocation.g1.easy} onChange={(v) => handleManualChange('g1', 'easy', v)} />
+                  <ManualInput label="Medium" value={manualAllocation.g1.medium} onChange={(v) => handleManualChange('g1', 'medium', v)} />
+                  <ManualInput label="Hard" value={manualAllocation.g1.hard} onChange={(v) => handleManualChange('g1', 'hard', v)} />
+                </div>
+              </div>
+
+              {/* Engagement */}
+              <div style={manualGroupStyle}>
+                <div style={{ fontWeight: 'bold', marginBottom: '10px', display: 'flex', alignItems: 'center' }}>
+                  <span style={{fontSize: '20px', marginRight: '10px'}}>✉️</span> Engagement (Typing)
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
+                  <ManualInput label="Easy" value={manualAllocation.g3.easy} onChange={(v) => handleManualChange('g3', 'easy', v)} />
+                  <ManualInput label="Medium" value={manualAllocation.g3.medium} onChange={(v) => handleManualChange('g3', 'medium', v)} />
+                  <ManualInput label="Hard" value={manualAllocation.g3.hard} onChange={(v) => handleManualChange('g3', 'hard', v)} />
+                </div>
+              </div>
+            </div>
+          )}
 
           <div style={{ 
             marginTop: '20px', 
@@ -257,6 +422,26 @@ export default function TaskAllocationScreen({
   );
 }
 
+// Helper Component for Manual Input
+const ManualInput = ({ label, value, onChange }) => (
+  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+    <label style={{ fontSize: '12px', marginBottom: '4px', color: '#666' }}>{label}</label>
+    <input 
+      type="number" 
+      min="0" 
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      style={{
+        width: '50px',
+        padding: '8px',
+        textAlign: 'center',
+        border: '1px solid #ddd',
+        borderRadius: '4px'
+      }}
+    />
+  </div>
+);
+
 const inputRowStyle = {
   display: 'flex',
   alignItems: 'center',
@@ -264,6 +449,13 @@ const inputRowStyle = {
   background: '#f9f9f9',
   padding: '15px',
   borderRadius: '8px'
+};
+
+const manualGroupStyle = {
+  background: '#f9f9f9',
+  padding: '15px',
+  borderRadius: '8px',
+  border: '1px solid #eee'
 };
 
 const labelStyle = {

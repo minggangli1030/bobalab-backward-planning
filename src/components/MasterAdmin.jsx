@@ -593,14 +593,26 @@ export default function MasterAdmin() {
             </div>
 
             <div style={{ marginBottom: "15px" }}>
+              <label style={{ display: "block", marginBottom: "5px", fontSize: "14px", fontWeight: "bold" }}>Difficulty Configuration</label>
+              <select 
+                value={gameConfig.difficultyMode || "fixed"} 
+                onChange={(e) => handleConfigChange("difficultyMode", e.target.value)}
+                style={{ width: "100%", padding: "8px", borderRadius: "4px", border: "1px solid #ddd" }}
+              >
+                <option value="fixed">Fixed (50% Easy, 30% Medium, 20% Hard)</option>
+                <option value="manual">Manual (User chooses difficulty)</option>
+              </select>
+            </div>
+
+            <div style={{ marginBottom: "15px" }}>
               <label style={{ display: "block", marginBottom: "5px", fontSize: "14px", fontWeight: "bold" }}>Task Order Strategy</label>
               <select 
                 value={gameConfig.taskOrderStrategy} 
                 onChange={(e) => handleConfigChange("taskOrderStrategy", e.target.value)}
                 style={{ width: "100%", padding: "8px", borderRadius: "4px", border: "1px solid #ddd" }}
               >
-                <option value="sequential">Sequential (Materials -> Research -> Engagement)</option>
-                <option value="random">Randomized</option>
+                <option value="sequential_task">Order by Task (Materials -> Research -> Engagement)</option>
+                <option value="sequential_difficulty">Order by Difficulty (Easy -> Medium -> Hard)</option>
               </select>
             </div>
           </div>

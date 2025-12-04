@@ -119,9 +119,10 @@ function App() {
     midtermEnabled: true,
     aiCost: 0,
     unfinishedTaskPenalty: 0,
-    taskOrderStrategy: "sequential",
+    taskOrderStrategy: "sequential_task",
     freezePenalty: 0,
-    contextAdviceEnabled: true
+    contextAdviceEnabled: true,
+    difficultyMode: "fixed"
   });
 
   // Load global config on mount
@@ -2714,6 +2715,7 @@ function App() {
       totalTasks={globalConfig.totalTasks}
       orderStrategy={globalConfig.taskOrderStrategy}
       durationMinutes={globalConfig.semesterDuration}
+      difficultyMode={globalConfig.difficultyMode}
     />;
   }
 
