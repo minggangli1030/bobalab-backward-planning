@@ -17,27 +17,141 @@ export default function TaskRunnerLayout({
   
   // Helper to get task name/icon
   const getTaskInfo = (type) => {
-    if (type.startsWith('g1')) return { name: 'Research', icon: '📚', color: '#9C27B0' };
-    if (type.startsWith('g2')) return { name: 'Materials', icon: '🎯', color: '#4CAF50' };
-    if (type.startsWith('g3')) return { name: 'Engagement', icon: '✉️', color: '#f44336' };
-    return { name: 'Unknown', icon: '❓', color: '#333' };
+    if (type.startsWith('g1')) return { name: 'Research', icon: '📚', color: '#9C27B0', bg: '#f3e5f5' };
+    if (type.startsWith('g2')) return { name: 'Materials', icon: '🎯', color: '#4CAF50', bg: '#e8f5e9' };
+    if (type.startsWith('g3')) return { name: 'Engagement', icon: '✉️', color: '#f44336', bg: '#ffebee' };
+    return { name: 'Unknown', icon: '❓', color: '#333', bg: '#eee' };
   };
 
   const currentInfo = getTaskInfo(currentTaskType);
 
-  // Calculate remaining counts per type
-  const remainingCounts = {
-    g1: taskQueue.filter(id => id.startsWith('g1')).length,
-    g2: taskQueue.filter(id => id.startsWith('g2')).length,
-    g3: taskQueue.filter(id => id.startsWith('g3')).length
+  // Calculate Progress Stats
+  const completedTasks = taskQueue.slice(0, currentTaskIndex);
+  const doneCounts = {
+    g1: completedTasks.filter(id => id.startsWith('g1')).length,
+    g2: completedTasks.filter(id => id.startsWith('g2')).length,
+    g3: completedTasks.filter(id => id.startsWith('g3')).length
+  };
+  const remainingCount = totalTasks - currentTaskIndex;
+
+  // Get upcoming tasks for Jars (including current if applicable, but usually we want switch targets)
+  // We want to show ALL tasks of each type that are AFTER the current index
+  // actually, we want to show available switch targets.
+  // The logic for "Jars" is:
+  // 1. Filter queue from currentTaskIndex onwards (or just all remaining?)
+  //    - Actually, we can only switch to the *next available* task of a different type.
+  //    - But the user wants to see "Jars filled with tasks".
+  //    - So let's show the queue separated by type.
+  
+  const upcomingQueue = taskQueue.slice(currentTaskIndex); // Includes current
+  
+  const jars = {
+    g2: upcomingQueue.filter(id => id.startsWith('g2')), // Materials
+    g1: upcomingQueue.filter(id => id.startsWith('g1')), // Research
+    g3: upcomingQueue.filter(id => id.startsWith('g3'))  // Engagement
   };
 
-  const hasTask1 = remainingCounts.g1 > 0; // Research
-  const hasTask2 = remainingCounts.g2 > 0; // Materials
-  const hasTask3 = remainingCounts.g3 > 0; // Engagement
+  const isCurrent = (type) => currentTaskType.startsWith(type);
+
+  const renderJar = (type, label, icon, color, bgColor, tasks) => {
+    const count = tasks.length;
+    const isActiveType = isCurrent(type);
+    const hasTasks = count > 0;
+    
+    // If this is the active type, the top task is the one we are working on.
+    // If it's not active, the top task is the switch target.
+    
+    return (
+      <div style={{ 
+        display: 'flex', 
+        flexDirection: 'column', 
+        alignItems: 'center',
+        background: bgColor,
+        borderRadius: '12px',
+        padding: '10px',
+        border: `2px solid ${isActiveType ? color : 'transparent'}`,
+        height: '100%',
+        position: 'relative'
+      }}>
+        {/* Header */}
+        <div style={{ fontSize: '14px', fontWeight: 'bold', color: color, marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+          <span>{icon}</span>
+          <span>{count}</span>
+        </div>
+
+        {/* Jar Content */}
+        <div style={{ 
+          flex: 1, 
+          width: '100%', 
+          display: 'flex', 
+          flexDirection: 'column', 
+          gap: '5px',
+          justifyContent: 'flex-end', // Stack from bottom
+          paddingBottom: '10px'
+        }}>
+          {hasTasks ? (
+            <>
+              {/* Stacked blocks for tasks */}
+              {tasks.slice(1).map((t, i) => (
+                 <div key={i} style={{
+                   height: '8px',
+                   width: '80%',
+                   background: color,
+                   opacity: 0.4,
+                   borderRadius: '4px',
+                   margin: '0 auto'
+                 }} />
+              ))}
+              
+              {/* Top Task (Button) */}
+              <button
+                onClick={() => !isActiveType && onSwitchTask(type)}
+                disabled={isActiveType}
+                style={{
+                  width: '100%',
+                  padding: '15px 5px',
+                  background: isActiveType ? color : 'white',
+                  color: isActiveType ? 'white' : color,
+                  border: `2px solid ${color}`,
+                  borderRadius: '8px',
+                  cursor: isActiveType ? 'default' : 'pointer',
+                  fontWeight: 'bold',
+                  fontSize: '12px',
+                  boxShadow: '0 2px 5px rgba(0,0,0,0.1)',
+                  transition: 'transform 0.1s',
+                  zIndex: 2
+                }}
+              >
+                {isActiveType ? 'Current' : 'Switch'}
+              </button>
+            </>
+          ) : (
+            // Empty State - Refill Button
+            <button 
+              onClick={() => onRefill && onRefill(type)}
+              style={{
+                width: '100%',
+                padding: '10px 5px',
+                background: 'white',
+                border: '2px dashed #999',
+                borderRadius: '8px',
+                color: '#666',
+                cursor: 'pointer',
+                fontSize: '12px'
+              }}
+            >
+              🔄 Refill
+            </button>
+          )}
+        </div>
+        
+        <div style={{ fontSize: '12px', color: '#666', marginTop: '5px' }}>{label}</div>
+      </div>
+    );
+  };
   
   return (
-    <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '20px' }}>
+    <div style={{ maxWidth: '1600px', margin: '0 auto', padding: '20px' }}>
       {/* Header */}
       <div style={{
         display: 'flex',
@@ -74,11 +188,30 @@ export default function TaskRunnerLayout({
           </div>
         </div>
 
-        {/* Right: Task Counter */}
-        <div style={{ textAlign: 'right', width: '200px' }}>
-          <div style={{ fontSize: '12px', color: '#666' }}>Task Progress</div>
-          <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#333' }}>
-            {currentTaskIndex + 1} / {totalTasks}
+        {/* Right: Detailed Task Progress */}
+        <div style={{ textAlign: 'right', minWidth: '300px' }}>
+          <div style={{ fontSize: '12px', color: '#666', marginBottom: '5px' }}>Task Progress</div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '15px' }}>
+            {/* Done Counts */}
+            <div style={{ display: 'flex', gap: '10px', fontSize: '16px', fontWeight: '500', color: '#555' }}>
+              <span title="Materials Done">🎯 {doneCounts.g2}</span>
+              <span style={{ color: '#ddd' }}>|</span>
+              <span title="Research Done">📚 {doneCounts.g1}</span>
+              <span style={{ color: '#ddd' }}>|</span>
+              <span title="Engagement Done">✉️ {doneCounts.g3}</span>
+            </div>
+            
+            {/* Remaining */}
+            <div style={{ 
+              background: '#eee', 
+              padding: '4px 12px', 
+              borderRadius: '20px', 
+              fontSize: '14px', 
+              fontWeight: 'bold',
+              color: '#333'
+            }}>
+              Remaining: {remainingCount}
+            </div>
           </div>
         </div>
       </div>
@@ -86,102 +219,31 @@ export default function TaskRunnerLayout({
       {/* Main Content Area - 3 Column Grid */}
       <div className="task-runner-layout" style={{ 
         display: 'grid', 
-        gridTemplateColumns: '250px 1fr 300px', 
+        gridTemplateColumns: '320px 1fr 320px', // Adjusted widths
         gap: '20px', 
         height: 'calc(100vh - 140px)', 
         boxSizing: 'border-box'
       }}>
-        {/* Left Column: Task Switching & Status */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          <div style={{ background: 'white', padding: '20px', borderRadius: '12px', boxShadow: '0 2px 10px rgba(0,0,0,0.05)' }}>
-            <h3 style={{ margin: '0 0 15px 0', fontSize: '16px', color: '#666' }}>Task Jars</h3>
-            
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {/* Materials (g2) */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                  <button
-                      disabled={!hasTask2 || currentTaskType.startsWith('g2')}
-                      onClick={() => onSwitchTask('g2')}
-                      style={switchButtonStyle(hasTask2 && !currentTaskType.startsWith('g2'), '#4CAF50')}
-                  >
-                      <span>🎯</span> Materials ({remainingCounts.g2})
-                  </button>
-                  {!hasTask2 && (
-                      <button onClick={() => onRefill && onRefill('g2')} style={refillButtonStyle}>
-                          🔄 Refill Materials
-                      </button>
-                  )}
-              </div>
-
-              {/* Research (g1) */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                  <button
-                      disabled={!hasTask1 || currentTaskType.startsWith('g1')}
-                      onClick={() => onSwitchTask('g1')}
-                      style={switchButtonStyle(hasTask1 && !currentTaskType.startsWith('g1'), '#9C27B0')}
-                  >
-                      <span>📚</span> Research ({remainingCounts.g1})
-                  </button>
-                  {!hasTask1 && (
-                      <button onClick={() => onRefill && onRefill('g1')} style={refillButtonStyle}>
-                          🔄 Refill Research
-                      </button>
-                  )}
-              </div>
-
-              {/* Engagement (g3) */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                  <button
-                      disabled={!hasTask3 || currentTaskType.startsWith('g3')}
-                      onClick={() => onSwitchTask('g3')}
-                      style={switchButtonStyle(hasTask3 && !currentTaskType.startsWith('g3'), '#f44336')}
-                  >
-                      <span>✉️</span> Engagement ({remainingCounts.g3})
-                  </button>
-                  {!hasTask3 && (
-                      <button onClick={() => onRefill && onRefill('g3')} style={refillButtonStyle}>
-                          🔄 Refill Engagement
-                      </button>
-                  )}
-              </div>
-            </div>
-          </div>
+        {/* Left Column: Task Jars */}
+        <div style={{ 
+          background: 'white', 
+          padding: '15px', 
+          borderRadius: '12px', 
+          boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
+          display: 'flex',
+          flexDirection: 'column'
+        }}>
+          <h3 style={{ margin: '0 0 15px 0', fontSize: '16px', color: '#666', textAlign: 'center' }}>Task Jars</h3>
           
-          {/* Queue Preview */}
           <div style={{ 
-            background: 'white', 
-            padding: '20px', 
-            borderRadius: '12px',
-            boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
-            flex: 1,
-            overflowY: 'auto'
+            display: 'grid', 
+            gridTemplateColumns: '1fr 1fr 1fr', 
+            gap: '10px',
+            flex: 1
           }}>
-            <h3 style={{ margin: '0 0 15px 0', fontSize: '16px', color: '#666' }}>Up Next</h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {taskQueue.slice(currentTaskIndex + 1, currentTaskIndex + 6).map((taskId, idx) => {
-                const info = getTaskInfo(taskId);
-                return (
-                  <div key={idx} style={{
-                    padding: '10px',
-                    background: '#f8f9fa',
-                    borderRadius: '6px',
-                    borderLeft: `3px solid ${info.color}`,
-                    fontSize: '14px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px'
-                  }}>
-                    <span>{info.icon}</span>
-                    <span>{info.name}</span>
-                  </div>
-                );
-              })}
-              {taskQueue.length > currentTaskIndex + 6 && (
-                <div style={{ textAlign: 'center', color: '#999', fontSize: '12px', marginTop: '5px' }}>
-                  + {taskQueue.length - (currentTaskIndex + 6)} more
-                </div>
-              )}
-            </div>
+            {renderJar('g2', 'Materials', '🎯', '#4CAF50', '#e8f5e9', jars.g2)}
+            {renderJar('g1', 'Research', '📚', '#9C27B0', '#f3e5f5', jars.g1)}
+            {renderJar('g3', 'Engagement', '✉️', '#f44336', '#ffebee', jars.g3)}
           </div>
         </div>
 
@@ -198,11 +260,15 @@ export default function TaskRunnerLayout({
         </div>
 
         {/* Right Column: AI Chat Interface */}
-        <div>
+        <div style={{
+          height: '100%',
+          overflow: 'hidden'
+        }}>
           {chatInterface && (
             <div style={{ 
-              position: 'sticky',
-              top: '20px'
+              height: '100%',
+              display: 'flex',
+              flexDirection: 'column'
             }}>
               {chatInterface}
             </div>
@@ -221,29 +287,3 @@ export default function TaskRunnerLayout({
     </div>
   );
 }
-
-const switchButtonStyle = (enabled, color) => ({
-  display: 'flex',
-  alignItems: 'center',
-  gap: '10px',
-  padding: '12px',
-  border: `1px solid ${enabled ? color : '#ddd'}`,
-  borderRadius: '8px',
-  background: enabled ? 'white' : '#f5f5f5',
-  color: enabled ? color : '#999',
-  cursor: enabled ? 'pointer' : 'not-allowed',
-  fontWeight: 'bold',
-  transition: 'all 0.2s',
-  opacity: enabled ? 1 : 0.7
-});
-
-const refillButtonStyle = {
-    padding: '8px',
-    fontSize: '12px',
-    background: '#eee',
-    border: '1px dashed #999',
-    borderRadius: '4px',
-    cursor: 'pointer',
-    color: '#333',
-    marginTop: '5px'
-};
