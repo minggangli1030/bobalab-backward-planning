@@ -238,26 +238,6 @@ export default function MasterAdmin({ onClose }) {
             <div style={{ background: "white", padding: "20px", borderRadius: "8px", boxShadow: "0 2px 4px rgba(0,0,0,0.1)" }}>
               <h3 style={{ margin: "0 0 15px 0", fontSize: "16px", color: "#555" }}>⚖️ Penalties & Mechanics</h3>
               
-              <div style={{ marginBottom: "15px" }}>
-                <label style={{ display: "block", marginBottom: "5px", fontSize: "13px", fontWeight: "600" }}>AI Help Cost (Points)</label>
-                <input 
-                  type="number" 
-                  value={gameConfig.aiCost} 
-                  onChange={(e) => handleConfigChange("aiCost", parseInt(e.target.value))}
-                  style={{ width: "100%", padding: "8px", borderRadius: "4px", border: "1px solid #ddd", fontSize: "14px" }}
-                />
-              </div>
-
-              <div style={{ marginBottom: "15px" }}>
-                <label style={{ display: "block", marginBottom: "5px", fontSize: "13px", fontWeight: "600" }}>Incorrect Answer Penalty (Points)</label>
-                <input 
-                  type="number" 
-                  value={gameConfig.wrongAnswerPenalty || 2} 
-                  onChange={(e) => handleConfigChange("wrongAnswerPenalty", parseInt(e.target.value))}
-                  style={{ width: "100%", padding: "8px", borderRadius: "4px", border: "1px solid #ddd", fontSize: "14px" }}
-                />
-              </div>
-
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "15px" }}>
                 <div>
                   <label style={{ display: "block", marginBottom: "5px", fontSize: "12px", fontWeight: "600" }}>Switch Cost (Points)</label>
