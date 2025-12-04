@@ -160,6 +160,12 @@ function App() {
   const [currentTaskIndex, setCurrentTaskIndex] = useState(0);
   const [allocationCounts, setAllocationCounts] = useState(null);
   const [isBonusRound, setIsBonusRound] = useState(false);
+  
+  // Chat State
+  const [chatMessages, setChatMessages] = useState([]);
+  const [isAiTyping, setIsAiTyping] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(true);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   // Refs
   const startTimeRef = useRef(Date.now());
@@ -2285,7 +2291,62 @@ function App() {
       finalScore,
     };
 
-    const handleNextSemester = async () => {
+    // Handle sending chat messages
+  const handleSendMessage = async (text) => {
+    // Add user message
+    const userMsg = { sender: "user", text, timestamp: Date.now() };
+    setChatMessages((prev) => [...prev, userMsg]);
+
+    // AI Response
+    setIsAiTyping(true);
+    
+    // Calculate context for AI
+    const context = {
+      currentTask: currentTab,
+      timeRemaining,
+      score: Math.round(studentLearningScore),
+      completedTasks: Object.keys(completed).length,
+      totalTasks: taskQueue.length
+    };
+
+    try {
+      // Simulate AI delay based on config
+      const delay = (globalConfig.aiDelay || 0) * 1000;
+      
+      // Get AI response
+      const responseText = await aiTaskHelper.getAdvice(text, context);
+      
+      setTimeout(() => {
+        const aiMsg = { sender: "ai", text: responseText, timestamp: Date.now() };
+        setChatMessages((prev) => [...prev, aiMsg]);
+        setIsAiTyping(false);
+        
+        if (!isChatOpen) {
+          setUnreadCount(prev => prev + 1);
+        }
+        
+        // Apply AI Cost if configured
+        if (globalConfig.aiCost > 0) {
+           setCategoryPoints(prev => ({
+             ...prev,
+             bonus: (prev.bonus || 0) - globalConfig.aiCost
+           }));
+           showNotification(`AI Help Cost: -${globalConfig.aiCost} pts`);
+        }
+      }, Math.max(1000, delay)); // Minimum 1s delay for realism
+      
+    } catch (error) {
+      console.error("AI Error:", error);
+      setIsAiTyping(false);
+      setChatMessages((prev) => [...prev, { 
+        sender: "ai", 
+        text: "I'm having trouble connecting right now. Please try again.", 
+        timestamp: Date.now() 
+      }]);
+    }
+  };
+
+  const handleNextSemester = async () => {
       const newHistory = [...semesterHistory, semesterData];
       setSemesterHistory(newHistory);
       localStorage.setItem("engagementInterest", "0");
