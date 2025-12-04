@@ -220,7 +220,7 @@ export default function TaskAllocationScreen({
         <p>Total tasks must add up to <strong>{totalTasks}</strong>.</p>
         {difficultyMode === 'fixed' && (
           <p style={{ fontSize: '14px', fontStyle: 'italic', color: '#666' }}>
-            * Tasks are automatically distributed as 50% Easy, 30% Medium, 20% Hard.
+            * Within each task type, tasks are distributed as 50% Easy, 30% Medium, 20% Hard.
           </p>
         )}
       </div>
