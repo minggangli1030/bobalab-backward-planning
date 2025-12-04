@@ -11,7 +11,7 @@ import { sessionManager } from "./utils/sessionManager";
 import { eventTracker } from "./utils/eventTracker";
 import { patternGenerator } from "./utils/patternGenerator";
 import { db } from "./firebase";
-import { doc, updateDoc, serverTimestamp } from "firebase/firestore";
+import { doc, updateDoc, serverTimestamp, getDoc } from "firebase/firestore";
 import "./App.css";
 import AdminPage from "./AdminPage";
 import GameModeSelector from "./components/GameModeSelector";
@@ -110,6 +110,45 @@ function App() {
   const [materialsAtResearchLevel, setMaterialsAtResearchLevel] = useState({});
   const [taskAttempts, setTaskAttempts] = useState({});
   const [taskPoints, setTaskPoints] = useState({});
+  
+  // Global Game Configuration
+  const [globalConfig, setGlobalConfig] = useState({
+    semesterDuration: 12,
+    totalTasks: 10,
+    totalSemesters: 2,
+    midtermEnabled: true,
+    aiCost: 0,
+    unfinishedTaskPenalty: 0,
+    taskOrderStrategy: "sequential",
+    freezePenalty: 0,
+    contextAdviceEnabled: true
+  });
+
+  // Load global config on mount
+  useEffect(() => {
+    const loadGlobalConfig = async () => {
+      try {
+        const docRef = doc(db, "game_settings", "global");
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          setGlobalConfig(prev => ({ ...prev, ...data }));
+          
+          // Apply time settings immediately
+          if (data.semesterDuration) {
+            const durationSeconds = data.semesterDuration * 60;
+            setTimeLimit(durationSeconds);
+            setTimeRemaining(durationSeconds);
+            timeLimitRef.current = durationSeconds;
+            timeRemainingRef.current = durationSeconds;
+          }
+        }
+      } catch (error) {
+        console.error("Error loading global config:", error);
+      }
+    };
+    loadGlobalConfig();
+  }, []);
 
   // NEW: Task Queue State
   const [taskQueue, setTaskQueue] = useState([]);
@@ -129,8 +168,7 @@ function App() {
 
   // Helper function to get checkpoint timing for display
   const getCheckpointMinutes = () => {
-    const config = JSON.parse(sessionStorage.getItem("gameConfig") || "{}");
-    const semesterDurationMs = config.semesterDuration || 720000; // Default 12 minutes
+    const semesterDurationMs = (globalConfig.semesterDuration || 12) * 60 * 1000;
     const checkpointTimeSeconds = Math.floor(semesterDurationMs / 2000); // Half duration in seconds
     return Math.floor(checkpointTimeSeconds / 60); // Convert to minutes for display
   };
@@ -505,11 +543,9 @@ function App() {
   };
 
   const handleCheckpoint = () => {
-    const config = JSON.parse(sessionStorage.getItem("gameConfig") || "{}");
-
     // Check if checkpoint is enabled for this student/admin
     const checkpointEnabled =
-      currentSemester === 2 && config.checkpointSemester2;
+      currentSemester === 2 && globalConfig.midtermEnabled;
 
     if (!checkpointEnabled) {
       // No checkpoint for this condition
@@ -541,9 +577,9 @@ function App() {
   };
 
   const startTimer = () => {
-    const config = JSON.parse(sessionStorage.getItem("gameConfig") || "{}");
-    const duration = config.semesterDuration || 720000;
-    const limitInSeconds = Math.floor(duration / 1000);
+    // Use global config duration if available, otherwise fallback
+    const durationMs = (globalConfig.semesterDuration || 12) * 60 * 1000;
+    const limitInSeconds = Math.floor(durationMs / 1000);
 
     setTimeLimit(limitInSeconds);
     setTimeRemaining(limitInSeconds);
@@ -574,11 +610,11 @@ function App() {
 
       // Check for checkpoint only if enabled
       const checkpointEnabled =
-        currentSemester === 2 && config.checkpointSemester2;
+        currentSemester === 2 && globalConfig.midtermEnabled;
 
       if (checkpointEnabled) {
         // Dynamic checkpoint time: semester duration / 2
-        const semesterDurationMs = config.semesterDuration || 720000; // Default 12 minutes
+        const semesterDurationMs = (globalConfig.semesterDuration || 12) * 60 * 1000;
         const checkpointTime = Math.floor(semesterDurationMs / 2000); // Half duration in seconds
 
         if (elapsedSeconds === checkpointTime && !checkpointReached) {
@@ -1068,7 +1104,16 @@ function App() {
 
     const finalStudentLearning = calculateStudentLearning();
     const totalBonus = categoryPoints.bonus || 0;
-    const finalScore = Math.round(finalStudentLearning) + totalBonus;
+    
+    // Calculate Unfinished Penalty
+    const unfinishedCount = Math.max(0, globalConfig.totalTasks - Object.keys(completed).length);
+    const unfinishedPenalty = unfinishedCount * (globalConfig.unfinishedTaskPenalty || 0);
+    
+    const finalScore = Math.round(finalStudentLearning) + totalBonus - unfinishedPenalty;
+    
+    if (unfinishedPenalty > 0) {
+      console.log(`⚠️ Unfinished Penalty: -${unfinishedPenalty} pts (${unfinishedCount} tasks x ${globalConfig.unfinishedTaskPenalty})`);
+    }
 
     await eventTracker.logEvent("game_complete", {
       totalTime: finalTime,
@@ -2664,7 +2709,12 @@ function App() {
   // Main challenge mode
   // Allocation Screen
   if (mode === "allocation") {
-    return <TaskAllocationScreen onStart={handleAllocationStart} />;
+    return <TaskAllocationScreen 
+      onStart={handleAllocationStart} 
+      totalTasks={globalConfig.totalTasks}
+      orderStrategy={globalConfig.taskOrderStrategy}
+      durationMinutes={globalConfig.semesterDuration}
+    />;
   }
 
   // Bonus Round Screen
@@ -2709,6 +2759,27 @@ function App() {
              categoryPoints={categoryPoints}
              timeRemaining={timeRemaining}
              calculateStudentLearning={calculateStudentLearning}
+             aiCost={globalConfig.aiCost}
+             onAiCost={(cost) => {
+               // Deduct points for AI usage? 
+               // Or just track it? The request says "Include penalty for AI".
+               // Usually penalties are deducted from final score or current score.
+               // Let's deduct from 'bonus' category for now to keep it simple, or add a 'penalties' category.
+               // Actually, let's just subtract from student learning score calculation if possible, 
+               // or better, track it in a separate state and subtract at the end.
+               // For visibility, let's subtract from 'bonus' (can go negative) or create a 'penalty' state.
+               
+               // Let's add a 'penalty' field to categoryPoints?
+               // Or just update studentLearningScore directly? No, that's calculated.
+               // Let's use a new state for penalties.
+               // Wait, I can't easily add state here without re-rendering everything.
+               // Let's just subtract from 'bonus' for now, effectively reducing the score.
+               setCategoryPoints(prev => ({
+                 ...prev,
+                 bonus: (prev.bonus || 0) - cost
+               }));
+               showNotification(`AI Usage Penalty: -${cost} pts`);
+             }}
            />
          }
        >

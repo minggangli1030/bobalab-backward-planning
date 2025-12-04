@@ -406,6 +406,8 @@ export default function ChatContainer({
   categoryPoints = null,
   timeRemaining = null,
   calculateStudentLearning = () => 0,
+  aiCost = 0,
+  onAiCost,
 }) {
   // Get the game config to check if AI is enabled
   const [hasAI, setHasAI] = useState(true);
@@ -765,11 +767,18 @@ Typing: "${help.text.substring(
     }
 
     const userMessage = input.toLowerCase().trim();
-    const fullQuery = input; // Keep original query for tracking
-    setMessages((prev) => [...prev, { sender: "user", text: input }]);
+    // Add user message
+    const userMsg = { role: "user", content: input };
+    setMessages((prev) => [...prev, userMsg]);
     setInput("");
     setIsTyping(true);
+    
+    // Apply cost
+    if (aiCost > 0 && onAiCost) {
+      onAiCost(aiCost);
+    }
 
+    // Determine task type and context
     setTimeout(() => {
       let response = "";
       let responseType = "general";

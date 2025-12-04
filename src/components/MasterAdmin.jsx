@@ -9,6 +9,9 @@ import {
   where,
   deleteDoc,
   serverTimestamp,
+  setDoc,
+  doc,
+  getDoc,
 } from "firebase/firestore";
 
 export default function MasterAdmin() {
@@ -17,6 +20,56 @@ export default function MasterAdmin() {
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  
+  // Game Configuration State
+  const [gameConfig, setGameConfig] = useState({
+    semesterDuration: 12,
+    totalTasks: 10,
+    totalSemesters: 2,
+    midtermEnabled: true,
+    aiCost: 0,
+    unfinishedTaskPenalty: 0,
+    taskOrderStrategy: "sequential",
+    freezePenalty: 0,
+    contextAdviceEnabled: true
+  });
+  const [savingConfig, setSavingConfig] = useState(false);
+
+  useEffect(() => {
+    loadGameConfig();
+  }, []);
+
+  const loadGameConfig = async () => {
+    try {
+      const docRef = doc(db, "game_settings", "global");
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        setGameConfig({ ...gameConfig, ...docSnap.data() });
+      }
+    } catch (error) {
+      console.error("Error loading game config:", error);
+    }
+  };
+
+  const handleConfigChange = (key, value) => {
+    setGameConfig(prev => ({
+      ...prev,
+      [key]: value
+    }));
+  };
+
+  const saveGameConfig = async () => {
+    setSavingConfig(true);
+    try {
+      await setDoc(doc(db, "game_settings", "global"), gameConfig);
+      alert("✅ Game configuration saved successfully!");
+    } catch (error) {
+      console.error("Error saving config:", error);
+      alert("Failed to save configuration.");
+    } finally {
+      setSavingConfig(false);
+    }
+  };
 
   // Complete student roster with sections
   const CLASS_1A_ID_CHECKPOINT = [
@@ -451,6 +504,141 @@ export default function MasterAdmin() {
           >
             {refreshing ? "Processing..." : "🗑️ Reset All Data"}
           </button>
+        </div>
+      </div>
+
+
+
+      {/* Game Configuration Panel */}
+      <div
+        style={{
+          background: "white",
+          borderRadius: "12px",
+          padding: "25px",
+          boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
+          marginBottom: "30px",
+          border: "2px solid #2196F3"
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+          <h2 style={{ margin: 0, color: "#2196F3", fontSize: "20px", display: "flex", alignItems: "center", gap: "10px" }}>
+            <span>⚙️</span> Game Configuration
+          </h2>
+          <button
+            onClick={saveGameConfig}
+            disabled={savingConfig}
+            style={{
+              padding: "10px 20px",
+              background: "#2196F3",
+              color: "white",
+              border: "none",
+              borderRadius: "6px",
+              cursor: "pointer",
+              fontWeight: "bold",
+              opacity: savingConfig ? 0.7 : 1
+            }}
+          >
+            {savingConfig ? "Saving..." : "💾 Save Settings"}
+          </button>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: "20px" }}>
+          {/* Semester Settings */}
+          <div style={{ background: "#f8f9fa", padding: "15px", borderRadius: "8px" }}>
+            <h3 style={{ fontSize: "16px", marginTop: 0, color: "#555" }}>⏱️ Time & Semesters</h3>
+            
+            <div style={{ marginBottom: "15px" }}>
+              <label style={{ display: "block", marginBottom: "5px", fontSize: "14px", fontWeight: "bold" }}>Semester Duration (minutes)</label>
+              <input 
+                type="number" 
+                value={gameConfig.semesterDuration} 
+                onChange={(e) => handleConfigChange("semesterDuration", parseInt(e.target.value))}
+                style={{ width: "100%", padding: "8px", borderRadius: "4px", border: "1px solid #ddd" }}
+              />
+            </div>
+
+            <div style={{ marginBottom: "15px" }}>
+              <label style={{ display: "block", marginBottom: "5px", fontSize: "14px", fontWeight: "bold" }}>Total Semesters</label>
+              <input 
+                type="number" 
+                value={gameConfig.totalSemesters} 
+                onChange={(e) => handleConfigChange("totalSemesters", parseInt(e.target.value))}
+                style={{ width: "100%", padding: "8px", borderRadius: "4px", border: "1px solid #ddd" }}
+              />
+            </div>
+
+            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              <input 
+                type="checkbox" 
+                checked={gameConfig.midtermEnabled} 
+                onChange={(e) => handleConfigChange("midtermEnabled", e.target.checked)}
+                id="midtermCheck"
+              />
+              <label htmlFor="midtermCheck" style={{ fontSize: "14px" }}>Enable Midterm Checkpoint</label>
+            </div>
+          </div>
+
+          {/* Task Settings */}
+          <div style={{ background: "#f8f9fa", padding: "15px", borderRadius: "8px" }}>
+            <h3 style={{ fontSize: "16px", marginTop: 0, color: "#555" }}>📋 Task Settings</h3>
+            
+            <div style={{ marginBottom: "15px" }}>
+              <label style={{ display: "block", marginBottom: "5px", fontSize: "14px", fontWeight: "bold" }}>Total Tasks per Semester</label>
+              <input 
+                type="number" 
+                value={gameConfig.totalTasks} 
+                onChange={(e) => handleConfigChange("totalTasks", parseInt(e.target.value))}
+                style={{ width: "100%", padding: "8px", borderRadius: "4px", border: "1px solid #ddd" }}
+              />
+            </div>
+
+            <div style={{ marginBottom: "15px" }}>
+              <label style={{ display: "block", marginBottom: "5px", fontSize: "14px", fontWeight: "bold" }}>Task Order Strategy</label>
+              <select 
+                value={gameConfig.taskOrderStrategy} 
+                onChange={(e) => handleConfigChange("taskOrderStrategy", e.target.value)}
+                style={{ width: "100%", padding: "8px", borderRadius: "4px", border: "1px solid #ddd" }}
+              >
+                <option value="sequential">Sequential (Materials -> Research -> Engagement)</option>
+                <option value="random">Randomized</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Penalties & Mechanics */}
+          <div style={{ background: "#f8f9fa", padding: "15px", borderRadius: "8px" }}>
+            <h3 style={{ fontSize: "16px", marginTop: 0, color: "#555" }}>⚖️ Penalties & Mechanics</h3>
+            
+            <div style={{ marginBottom: "15px" }}>
+              <label style={{ display: "block", marginBottom: "5px", fontSize: "14px", fontWeight: "bold" }}>AI Help Cost (Points)</label>
+              <input 
+                type="number" 
+                value={gameConfig.aiCost} 
+                onChange={(e) => handleConfigChange("aiCost", parseInt(e.target.value))}
+                style={{ width: "100%", padding: "8px", borderRadius: "4px", border: "1px solid #ddd" }}
+              />
+            </div>
+
+            <div style={{ marginBottom: "15px" }}>
+              <label style={{ display: "block", marginBottom: "5px", fontSize: "14px", fontWeight: "bold" }}>Unfinished Task Penalty (Points)</label>
+              <input 
+                type="number" 
+                value={gameConfig.unfinishedTaskPenalty} 
+                onChange={(e) => handleConfigChange("unfinishedTaskPenalty", parseInt(e.target.value))}
+                style={{ width: "100%", padding: "8px", borderRadius: "4px", border: "1px solid #ddd" }}
+              />
+            </div>
+
+            <div style={{ marginBottom: "15px" }}>
+              <label style={{ display: "block", marginBottom: "5px", fontSize: "14px", fontWeight: "bold" }}>Freeze Penalty (Points)</label>
+              <input 
+                type="number" 
+                value={gameConfig.freezePenalty} 
+                onChange={(e) => handleConfigChange("freezePenalty", parseInt(e.target.value))}
+                style={{ width: "100%", padding: "8px", borderRadius: "4px", border: "1px solid #ddd" }}
+              />
+            </div>
+          </div>
         </div>
       </div>
 

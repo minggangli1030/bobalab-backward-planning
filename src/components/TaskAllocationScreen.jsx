@@ -1,14 +1,20 @@
 import React, { useState } from 'react';
 
-export default function TaskAllocationScreen({ onStart }) {
-  const [counts, setCounts] = useState({
-    task1: 0, // Slider (Materials)
-    task2: 0, // Counting (Research)
-    task3: 0  // Typing (Engagement)
+export default function TaskAllocationScreen({ 
+  onStart, 
+  totalTasks = 10, 
+  orderStrategy = "sequential",
+  durationMinutes = 12
+}) {
+  const [allocation, setAllocation] = useState({
+    g2: 0, // Materials (was slider)
+    g1: 0, // Research (was counting)
+    g3: 0, // Engagement (was typing)
   });
   
   const [aiChat, setAiChat] = useState([]);
   const [aiClickCount, setAiClickCount] = useState(0);
+  const [error, setError] = useState(null);
 
   const aiResponses = [
     "It's generally smart to do roughly an even number of each task.",
@@ -24,7 +30,6 @@ export default function TaskAllocationScreen({ onStart }) {
       }]);
       setAiClickCount(prev => prev + 1);
     } else {
-        // Optional: Loop or generic message if they keep clicking
         setAiChat(prev => [...prev, {
             sender: 'AI',
             text: "I've shared my best advice! It's up to you now."
@@ -32,45 +37,53 @@ export default function TaskAllocationScreen({ onStart }) {
     }
   };
 
-  const handleCountChange = (task, value) => {
+  const handleCountChange = (taskKey, value) => {
     const num = parseInt(value) || 0;
-    setCounts(prev => ({
+    setAllocation(prev => ({
       ...prev,
-      [task]: Math.max(0, num)
+      [taskKey]: Math.max(0, num)
     }));
+    setError(null);
   };
 
-  const totalTasks = counts.task1 + counts.task2 + counts.task3;
-  const isValid = totalTasks === 10;
+  const currentTotal = Object.values(allocation).reduce((a, b) => a + b, 0);
+  const isValid = currentTotal === totalTasks;
 
   const handleStart = () => {
-    if (!isValid) return;
+    if (currentTotal !== totalTasks) {
+      setError(`Total tasks must equal ${totalTasks}. Currently: ${currentTotal}`);
+      return;
+    }
+
+    // Generate task queue
+    let queue = [];
     
-    // Generate queue
-    // Order: We need to decide a default order. 
-    // The prompt says: "If the person puts in Task 1 = 2 times, Task 2 = 3 times, and Task 3 = 5 times, then the system will navigate through the tasks exactly in this sequence."
-    // Implication: T1s first, then T2s, then T3s.
-    
-    const queue = [];
-    for (let i = 0; i < counts.task1; i++) queue.push('g2'); // Materials/Slider
-    for (let i = 0; i < counts.task2; i++) queue.push('g1'); // Research/Counting
-    for (let i = 0; i < counts.task3; i++) queue.push('g3'); // Engagement/Typing
-    
-    // Note: Mapping based on App.jsx logic:
-    // g1 = Research (Counting)
-    // g2 = Materials (Slider)
-    // g3 = Engagement (Typing)
-    // Wait, prompt says "Task 1 (slider task)". 
-    // In App.jsx: 
-    // g2t1 -> Materials (was slider)
-    // g1t1 -> Research (was counting)
-    // g3t1 -> Engagement (was typing)
-    
-    // So Task 1 = Slider = g2
-    // Task 2 = Counting = g1 (Assuming standard order, but let's verify mapping in UI)
-    // Task 3 = Typing = g3
-    
-    onStart(queue, counts);
+    if (orderStrategy === "random") {
+      // Create pool and shuffle
+      const pool = [
+        ...Array(allocation.g2).fill('g2'),
+        ...Array(allocation.g1).fill('g1'),
+        ...Array(allocation.g3).fill('g3')
+      ];
+      // Fisher-Yates shuffle
+      for (let i = pool.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [pool[i], pool[j]] = [pool[j], pool[i]];
+      }
+      // Assign levels
+      const counts = { g1: 0, g2: 0, g3: 0 };
+      queue = pool.map(type => {
+        counts[type]++;
+        return `${type}t${counts[type]}`;
+      });
+    } else {
+      // Sequential: Materials (g2) -> Research (g1) -> Engagement (g3)
+      for (let i = 0; i < allocation.g2; i++) queue.push(`g2t${i + 1}`);
+      for (let i = 0; i < allocation.g1; i++) queue.push(`g1t${i + 1}`);
+      for (let i = 0; i < allocation.g3; i++) queue.push(`g3t${i + 1}`);
+    }
+
+    onStart(queue, allocation);
   };
 
   return (
@@ -87,9 +100,9 @@ export default function TaskAllocationScreen({ onStart }) {
       </h1>
 
       <div style={{ marginBottom: '30px', lineHeight: '1.6', color: '#555' }}>
-        <p>You have <strong>12 minutes</strong> to complete <strong>10 tasks</strong>.</p>
+        <p>You have <strong>{durationMinutes} minutes</strong> to complete <strong>{totalTasks} tasks</strong>.</p>
         <p>You must decide now how many of each task type you want to perform.</p>
-        <p>Total tasks must add up to <strong>10</strong>.</p>
+        <p>Total tasks must add up to <strong>{totalTasks}</strong>.</p>
       </div>
 
       <div style={{ 
@@ -108,9 +121,9 @@ export default function TaskAllocationScreen({ onStart }) {
             <input 
               type="number" 
               min="0" 
-              max="10"
-              value={counts.task1}
-              onChange={(e) => handleCountChange('task1', e.target.value)}
+              max={totalTasks}
+              value={allocation.g2}
+              onChange={(e) => handleCountChange('g2', e.target.value)}
               style={inputStyle}
             />
           </div>
@@ -123,9 +136,9 @@ export default function TaskAllocationScreen({ onStart }) {
             <input 
               type="number" 
               min="0" 
-              max="10"
-              value={counts.task2}
-              onChange={(e) => handleCountChange('task2', e.target.value)}
+              max={totalTasks}
+              value={allocation.g1}
+              onChange={(e) => handleCountChange('g1', e.target.value)}
               style={inputStyle}
             />
           </div>
@@ -138,9 +151,9 @@ export default function TaskAllocationScreen({ onStart }) {
             <input 
               type="number" 
               min="0" 
-              max="10"
-              value={counts.task3}
-              onChange={(e) => handleCountChange('task3', e.target.value)}
+              max={totalTasks}
+              value={allocation.g3}
+              onChange={(e) => handleCountChange('g3', e.target.value)}
               style={inputStyle}
             />
           </div>
@@ -154,8 +167,14 @@ export default function TaskAllocationScreen({ onStart }) {
             fontWeight: 'bold',
             color: isValid ? '#2e7d32' : '#c62828'
           }}>
-            Total Allocated: {totalTasks} / 10
+            Total Allocated: {currentTotal} / {totalTasks}
           </div>
+          
+          {error && (
+            <div style={{ color: 'red', textAlign: 'center', fontSize: '14px' }}>
+              {error}
+            </div>
+          )}
         </div>
 
         {/* Right Col: AI Help */}
