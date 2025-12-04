@@ -122,7 +122,11 @@ function App() {
     taskOrderStrategy: "sequential_task",
     freezePenalty: 0,
     contextAdviceEnabled: true,
-    difficultyMode: "fixed"
+    difficultyMode: "fixed",
+    switchCost: 0,
+    jarRefillFreezeTime: 0,
+    unfinishedJarPenalty: 0,
+    aiDelay: 0
   });
 
   // Load global config on mount
@@ -722,38 +726,56 @@ function App() {
   };
 
   const handleSwitchTask = (targetType) => {
-    // 1. Move current task to end
-    // 2. Find first targetType and move to current
-    
-    const currentType = taskQueue[currentTaskIndex];
-    if (currentType === targetType) return; // Should be disabled in UI anyway
-    
+    // 1. Identify current task type
+    const currentType = taskQueue[currentTaskIndex].substring(0, 2); // e.g., 'g1'
+    if (currentType === targetType) return; 
+
+    // 2. Apply Switch Cost
+    const cost = globalConfig.switchCost || 0;
+    if (cost > 0) {
+       // Deduct from bonus or create a penalty state? 
+       // Let's deduct from bonus for now, or just track it.
+       // The user request said "Knapsack - people can deviate from original plan but with a cost"
+       // Let's subtract from total score (bonus)
+       setCategoryPoints(prev => ({
+         ...prev,
+         bonus: (prev.bonus || 0) - cost
+       }));
+       showNotification(`Switching tasks cost ${cost} points!`);
+    }
+
     const newQueue = [...taskQueue];
     
-    // Remove current
-    const currentItem = newQueue.splice(currentTaskIndex, 1)[0];
-    newQueue.push(currentItem);
+    // 3. Move ALL remaining tasks of currentType to the end
+    //    Move ALL tasks of targetType to current position
+    //    Preserve internal order (Easy -> Medium -> Hard)
     
-    // Find target (search from current index, as we shifted everything left)
-    // Actually, since we removed one, the next item is now at currentTaskIndex.
-    // We search from currentTaskIndex to find the target.
-    const targetIndex = newQueue.findIndex((t, i) => i >= currentTaskIndex && t.startsWith(targetType));
+    // Get all items starting from current index
+    const remainingQueue = newQueue.slice(currentTaskIndex);
+    const pastQueue = newQueue.slice(0, currentTaskIndex);
     
-    if (targetIndex !== -1) {
-      const targetItem = newQueue.splice(targetIndex, 1)[0];
-      newQueue.splice(currentTaskIndex, 0, targetItem);
-      
-      setTaskQueue(newQueue);
-      setSwitches(prev => prev + 1);
-      
-      // Update Current Tab
-      // We need to calculate the level for this new task type
-      const type = targetItem; // e.g. 'g2'
-      const completedCount = Object.keys(completed).filter(k => k.startsWith(type)).length;
-      const nextLevel = completedCount + 1;
-      const newTab = `${type}t${nextLevel}`;
-      
-      handleTabSwitch(newTab);
+    const currentTypeItems = remainingQueue.filter(id => id.startsWith(currentType));
+    const targetTypeItems = remainingQueue.filter(id => id.startsWith(targetType));
+    const otherItems = remainingQueue.filter(id => !id.startsWith(currentType) && !id.startsWith(targetType));
+    
+    // Reconstruct queue:
+    // [Past Items] + [Target Items] + [Other Items] + [Current Type Items]
+    // Wait, "switch to a different pool/jar... need to finish all of jar B before returning back to A"
+    // So B comes first, then others, then A? Or just swap A and B blocks?
+    // "switching from task A to task B will make it becomes B1, B2, A1, A2" (assuming others are after)
+    // So we put Target First, then Current Last (of the active set).
+    
+    const reorderedRemaining = [...targetTypeItems, ...otherItems, ...currentTypeItems];
+    
+    const finalQueue = [...pastQueue, ...reorderedRemaining];
+    
+    setTaskQueue(finalQueue);
+    setSwitches(prev => prev + 1);
+    
+    // Update Current Tab to the first item of the new block (which is the first of targetTypeItems)
+    if (targetTypeItems.length > 0) {
+        const newTab = targetTypeItems[0];
+        handleTabSwitch(newTab);
     }
   };
 
@@ -2751,6 +2773,8 @@ function App() {
          totalTasks={taskQueue.length}
          taskQueue={taskQueue}
          onSwitchTask={handleSwitchTask}
+         onRefill={handleRefillJar}
+         allocationCounts={allocationCounts}
          points={Math.round(studentLearningScore)}
          timeRemaining={timeRemaining}
          onTimeUp={() => handleGameComplete("time_up")}

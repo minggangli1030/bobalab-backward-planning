@@ -615,6 +615,48 @@ export default function MasterAdmin() {
                 <option value="sequential_difficulty">Order by Difficulty (Easy -> Medium -> Hard)</option>
               </select>
             </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "15px", marginBottom: "15px" }}>
+               <div>
+                <label style={{ display: "block", marginBottom: "5px", fontSize: "14px", fontWeight: "bold" }}>Switch Cost (Points)</label>
+                <input 
+                  type="number" 
+                  value={gameConfig.switchCost || 0} 
+                  onChange={(e) => handleConfigChange("switchCost", parseInt(e.target.value))}
+                  style={{ width: "100%", padding: "8px", borderRadius: "4px", border: "1px solid #ddd" }}
+                />
+              </div>
+              <div>
+                <label style={{ display: "block", marginBottom: "5px", fontSize: "14px", fontWeight: "bold" }}>Refill Freeze (Seconds)</label>
+                <input 
+                  type="number" 
+                  value={gameConfig.jarRefillFreezeTime || 0} 
+                  onChange={(e) => handleConfigChange("jarRefillFreezeTime", parseInt(e.target.value))}
+                  style={{ width: "100%", padding: "8px", borderRadius: "4px", border: "1px solid #ddd" }}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "15px", marginBottom: "15px" }}>
+               <div>
+                <label style={{ display: "block", marginBottom: "5px", fontSize: "14px", fontWeight: "bold" }}>Unfinished Jar Penalty (Pts)</label>
+                <input 
+                  type="number" 
+                  value={gameConfig.unfinishedJarPenalty || 0} 
+                  onChange={(e) => handleConfigChange("unfinishedJarPenalty", parseInt(e.target.value))}
+                  style={{ width: "100%", padding: "8px", borderRadius: "4px", border: "1px solid #ddd" }}
+                />
+              </div>
+              <div>
+                <label style={{ display: "block", marginBottom: "5px", fontSize: "14px", fontWeight: "bold" }}>AI Delay (Seconds)</label>
+                <input 
+                  type="number" 
+                  value={gameConfig.aiDelay || 0} 
+                  onChange={(e) => handleConfigChange("aiDelay", parseInt(e.target.value))}
+                  style={{ width: "100%", padding: "8px", borderRadius: "4px", border: "1px solid #ddd" }}
+                />
+              </div>
+            </div>
           </div>
 
           {/* Penalties & Mechanics */}

@@ -6,6 +6,7 @@ export default function TaskRunnerLayout({
   totalTasks,
   taskQueue,
   onSwitchTask,
+  onRefill,
   children,
   points,
   timeRemaining,
@@ -24,15 +25,16 @@ export default function TaskRunnerLayout({
 
   const currentInfo = getTaskInfo(currentTaskType);
 
-  // Check availability for switching
-  // We can only switch to a task type if it exists LATER in the queue
-  const remainingQueue = taskQueue.slice(currentTaskIndex + 1);
-  const hasTask2 = remainingQueue.some(t => t.startsWith('g1')); // Research
-  const hasTask1 = remainingQueue.some(t => t.startsWith('g2')); // Materials
-  const hasTask3 = remainingQueue.some(t => t.startsWith('g3')); // Engagement
+  // Calculate remaining counts per type
+  const remainingCounts = {
+    g1: taskQueue.filter(id => id.startsWith('g1')).length,
+    g2: taskQueue.filter(id => id.startsWith('g2')).length,
+    g3: taskQueue.filter(id => id.startsWith('g3')).length
+  };
 
-  // Current task counts
-  const completedCount = currentTaskIndex;
+  const hasTask1 = remainingCounts.g1 > 0; // Research
+  const hasTask2 = remainingCounts.g2 > 0; // Materials
+  const hasTask3 = remainingCounts.g3 > 0; // Engagement
   
   return (
     <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '20px' }}>
@@ -76,108 +78,122 @@ export default function TaskRunnerLayout({
         <div style={{ textAlign: 'right', width: '200px' }}>
           <div style={{ fontSize: '12px', color: '#666' }}>Task Progress</div>
           <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#333' }}>
-            {completedCount} / {totalTasks}
+            {currentTaskIndex + 1} / {totalTasks}
           </div>
         </div>
       </div>
 
       {/* Main Content Area - 3 Column Grid */}
-      <div style={{ 
+      <div className="task-runner-layout" style={{ 
         display: 'grid', 
-        gridTemplateColumns: '280px 1fr 320px', 
-        gap: '20px',
-        alignItems: 'start' 
+        gridTemplateColumns: '250px 1fr 300px', 
+        gap: '20px', 
+        height: 'calc(100vh - 140px)', 
+        boxSizing: 'border-box'
       }}>
-        
-        {/* Left Column: Switching Controls */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-          <div style={{ 
-            background: 'white', 
-            padding: '20px', 
-            borderRadius: '12px',
-            boxShadow: '0 2px 10px rgba(0,0,0,0.05)'
-          }}>
-            <h3 style={{ marginTop: 0, fontSize: '16px', color: '#555' }}>Switch Task</h3>
-            <p style={{ fontSize: '13px', color: '#777', marginBottom: '15px' }}>
-              Pause current task and switch to another type. The current task will be moved to the end of the queue.
-            </p>
-
+        {/* Left Column: Task Switching & Status */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div style={{ background: 'white', padding: '20px', borderRadius: '12px', boxShadow: '0 2px 10px rgba(0,0,0,0.05)' }}>
+            <h3 style={{ margin: '0 0 15px 0', fontSize: '16px', color: '#666' }}>Task Jars</h3>
+            
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {/* Switch to Materials (g2) */}
-              <button
-                disabled={!hasTask1 || currentTaskType.startsWith('g2')}
-                onClick={() => onSwitchTask('g2')}
-                style={switchButtonStyle(hasTask1 && !currentTaskType.startsWith('g2'), '#4CAF50')}
-              >
-                <span>🎯</span> Switch to Materials
-              </button>
+              {/* Materials (g2) */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                  <button
+                      disabled={!hasTask2 || currentTaskType.startsWith('g2')}
+                      onClick={() => onSwitchTask('g2')}
+                      style={switchButtonStyle(hasTask2 && !currentTaskType.startsWith('g2'), '#4CAF50')}
+                  >
+                      <span>🎯</span> Materials ({remainingCounts.g2})
+                  </button>
+                  {!hasTask2 && (
+                      <button onClick={() => onRefill && onRefill('g2')} style={refillButtonStyle}>
+                          🔄 Refill Materials
+                      </button>
+                  )}
+              </div>
 
-              {/* Switch to Research (g1) */}
-              <button
-                disabled={!hasTask2 || currentTaskType.startsWith('g1')}
-                onClick={() => onSwitchTask('g1')}
-                style={switchButtonStyle(hasTask2 && !currentTaskType.startsWith('g1'), '#9C27B0')}
-              >
-                <span>📚</span> Switch to Research
-              </button>
+              {/* Research (g1) */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                  <button
+                      disabled={!hasTask1 || currentTaskType.startsWith('g1')}
+                      onClick={() => onSwitchTask('g1')}
+                      style={switchButtonStyle(hasTask1 && !currentTaskType.startsWith('g1'), '#9C27B0')}
+                  >
+                      <span>📚</span> Research ({remainingCounts.g1})
+                  </button>
+                  {!hasTask1 && (
+                      <button onClick={() => onRefill && onRefill('g1')} style={refillButtonStyle}>
+                          🔄 Refill Research
+                      </button>
+                  )}
+              </div>
 
-              {/* Switch to Engagement (g3) */}
-              <button
-                disabled={!hasTask3 || currentTaskType.startsWith('g3')}
-                onClick={() => onSwitchTask('g3')}
-                style={switchButtonStyle(hasTask3 && !currentTaskType.startsWith('g3'), '#f44336')}
-              >
-                <span>✉️</span> Switch to Engagement
-              </button>
+              {/* Engagement (g3) */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                  <button
+                      disabled={!hasTask3 || currentTaskType.startsWith('g3')}
+                      onClick={() => onSwitchTask('g3')}
+                      style={switchButtonStyle(hasTask3 && !currentTaskType.startsWith('g3'), '#f44336')}
+                  >
+                      <span>✉️</span> Engagement ({remainingCounts.g3})
+                  </button>
+                  {!hasTask3 && (
+                      <button onClick={() => onRefill && onRefill('g3')} style={refillButtonStyle}>
+                          🔄 Refill Engagement
+                      </button>
+                  )}
+              </div>
             </div>
           </div>
           
           {/* Queue Preview */}
           <div style={{ 
-            background: '#f8f9fa', 
-            padding: '15px', 
+            background: 'white', 
+            padding: '20px', 
             borderRadius: '12px',
-            fontSize: '12px',
-            color: '#666'
+            boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
+            flex: 1,
+            overflowY: 'auto'
           }}>
-            <strong>Next up:</strong>
-            <div style={{ marginTop: '10px', display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
-              {remainingQueue.slice(0, 5).map((t, i) => (
-                <span key={i} style={{ 
-                  background: getTaskInfo(t).color, 
-                  color: 'white', 
-                  padding: '2px 6px', 
-                  borderRadius: '4px',
-                  opacity: 0.7
-                }}>
-                  {getTaskInfo(t).icon}
-                </span>
-              ))}
-              {remainingQueue.length > 5 && <span>+{remainingQueue.length - 5} more</span>}
+            <h3 style={{ margin: '0 0 15px 0', fontSize: '16px', color: '#666' }}>Up Next</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {taskQueue.slice(currentTaskIndex + 1, currentTaskIndex + 6).map((taskId, idx) => {
+                const info = getTaskInfo(taskId);
+                return (
+                  <div key={idx} style={{
+                    padding: '10px',
+                    background: '#f8f9fa',
+                    borderRadius: '6px',
+                    borderLeft: `3px solid ${info.color}`,
+                    fontSize: '14px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}>
+                    <span>{info.icon}</span>
+                    <span>{info.name}</span>
+                  </div>
+                );
+              })}
+              {taskQueue.length > currentTaskIndex + 6 && (
+                <div style={{ textAlign: 'center', color: '#999', fontSize: '12px', marginTop: '5px' }}>
+                  + {taskQueue.length - (currentTaskIndex + 6)} more
+                </div>
+              )}
             </div>
           </div>
         </div>
 
-        {/* Center Column: Task Area */}
+        {/* Center Column: Task Content */}
         <div style={{ 
           background: 'white', 
           borderRadius: '12px', 
-          padding: '20px',
-          boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
-          minHeight: '500px'
+          boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column'
         }}>
-          <div style={{ 
-            marginBottom: '20px', 
-            paddingBottom: '15px', 
-            borderBottom: '1px solid #eee',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px'
-          }}>
-            <span style={{ fontSize: '24px' }}>{currentInfo.icon}</span>
-            <h2 style={{ margin: 0, color: currentInfo.color }}>Current: {currentInfo.name}</h2>
-          </div>
-          
           {children}
         </div>
 
@@ -220,3 +236,14 @@ const switchButtonStyle = (enabled, color) => ({
   transition: 'all 0.2s',
   opacity: enabled ? 1 : 0.7
 });
+
+const refillButtonStyle = {
+    padding: '8px',
+    fontSize: '12px',
+    background: '#eee',
+    border: '1px dashed #999',
+    borderRadius: '4px',
+    cursor: 'pointer',
+    color: '#333',
+    marginTop: '5px'
+};

@@ -741,63 +741,100 @@ Typing: "${help.text.substring(
         ]);
       }
     } else {
-      setMessages((prev) => [
-        ...prev,
-        {
-          sender: "bot",
-          text: "Please navigate to the engagement tab first!",
-        },
-      ]);
+      const [isLoading, setIsLoading] = useState(false);
+  const [progress, setProgress] = useState(0);
+
+  // Scroll to bottom on new messages
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [messages]);
+
+  const handleSendMessage = async (e) => {
+    e.preventDefault();
+    if (!inputMessage.trim() || isLoading) return;
+
+    // Check if user has enough points
+    if (aiCost > 0 && points < aiCost) {
+        setMessages(prev => [...prev, {
+            id: Date.now(),
+            text: `Not enough points! You need ${aiCost} points to use AI help.`,
+            sender: 'system'
+        }]);
+        return;
+    }
+
+    const userMsg = {
+      id: Date.now(),
+      text: inputMessage,
+      sender: "user",
+    };
+
+    setMessages((prev) => [...prev, userMsg]);
+    setInputMessage("");
+    setIsLoading(true);
+    setProgress(0);
+
+    // AI Delay Logic
+    const delaySeconds = globalConfig?.aiDelay || 0;
+    
+    if (delaySeconds > 0) {
+        const intervalTime = 100; // Update every 100ms
+        const totalSteps = (delaySeconds * 1000) / intervalTime;
+        let currentStep = 0;
+        
+        const timer = setInterval(() => {
+            currentStep++;
+            const newProgress = (currentStep / totalSteps) * 100;
+            setProgress(newProgress);
+            
+            if (currentStep >= totalSteps) {
+                clearInterval(timer);
+                processAIResponse(userMsg.text);
+            }
+        }, intervalTime);
+    } else {
+        processAIResponse(userMsg.text);
     }
   };
+  
+  const processAIResponse = async (text) => {
+    try {
+      // Deduct cost
+      if (onAiCost) onAiCost(aiCost);
 
-  const handleSend = () => {
-    if (!input.trim()) return;
-    if (!hasAI) {
+      const response = await aiTaskHelper.getHelp(
+        currentTaskId,
+        text,
+        taskContext
+      );
+
+      const aiMsg = {
+        id: Date.now() + 1,
+        text: response,
+        sender: "ai",
+      };
+      setMessages((prev) => [...prev, aiMsg]);
+    } catch (error) {
+      console.error("Error getting AI response:", error);
       setMessages((prev) => [
         ...prev,
-        { sender: "user", text: input },
         {
-          sender: "bot",
-          text: "AI assistance is not available for this session.",
+          id: Date.now() + 1,
+          text: "Sorry, I encountered an error. Please try again.",
+          sender: "ai",
         },
       ]);
-      setInput("");
-      return;
+    } finally {
+      setIsLoading(false);
+      setProgress(0);
     }
-
-    const userMessage = input.toLowerCase().trim();
-    // Add user message
-    const userMsg = { role: "user", content: input };
-    setMessages((prev) => [...prev, userMsg]);
-    setInput("");
-    setIsTyping(true);
-    
-    // Apply cost
-    if (aiCost > 0 && onAiCost) {
-      onAiCost(aiCost);
-    }
-
-    // Determine task type and context
-    setTimeout(() => {
-      let response = "";
-      let responseType = "general";
-
-      // Check for text-based help commands (backward compatibility)
-      if (userMessage.includes("help")) {
-        responseType = "help_request";
-        if (
-          userMessage.includes("material") ||
-          userMessage.includes("slider")
-        ) {
-          handleSmartHelp("materials");
-          setIsTyping(false);
-          return;
+  };    return;
         } else if (
           userMessage.includes("research") ||
           userMessage.includes("count")
         ) {
-          handleSmartHelp("research");
           setIsTyping(false);
           return;
         } else if (
@@ -905,21 +942,28 @@ Typing: "${help.text.substring(
       </div>
 
       <div className="messages-sidebar">
-        {messages.map((msg, idx) => (
-          <div key={idx} className={`message ${msg.sender}`}>
-            <div className="message-sender">
-              {msg.sender === "user" ? "You" : hasAI ? "AI" : "System"}:
+        <div className="messages-list">
+          {messages.map((msg) => (
+            <div key={msg.id} className={`message ${msg.sender}`}>
+              <div className="message-content">{msg.text}</div>
             </div>
-            <div className="message-text">{msg.text}</div>
-          </div>
-        ))}
-        {isTyping && hasAI && (
-          <div className="message bot">
-            <div className="message-sender">AI:</div>
-            <div className="message-text typing">...</div>
-          </div>
-        )}
-        <div ref={messagesEndRef} />
+          ))}
+          {isLoading && (
+            <div className="message ai loading">
+              <div className="typing-indicator">
+                <span></span>
+                <span></span>
+                <span></span>
+              </div>
+              {progress > 0 && (
+                  <div style={{ width: '100%', height: '4px', background: '#eee', marginTop: '5px', borderRadius: '2px' }}>
+                      <div style={{ width: `${progress}%`, height: '100%', background: '#2196F3', borderRadius: '2px', transition: 'width 0.1s linear' }}></div>
+                  </div>
+              )}
+            </div>
+          )}
+          <div ref={messagesEndRef} />
+        </div>
       </div>
 
       {/* Chat Input */}
