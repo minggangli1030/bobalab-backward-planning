@@ -510,7 +510,11 @@ function App() {
   if (window.location.search.includes("master=true")) {
     const config = JSON.parse(sessionStorage.getItem("gameConfig") || "{}");
     if (config.role === "master_admin") {
-      return <MasterAdmin onClose={() => setMode("landing")} />;
+      return <MasterAdmin onClose={() => {
+        // Clear URL params and reload to truly exit admin mode
+        window.history.replaceState({}, document.title, window.location.pathname);
+        window.location.reload();
+      }} />;
     }
   }
 

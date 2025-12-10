@@ -73,13 +73,87 @@ export default function MasterAdmin({ onClose }) {
   const fetchStudents = async () => {
     setLoading(true);
     try {
+      // 1. Fetch Roster (Students)
       const studentsRef = collection(db, "students");
-      const querySnapshot = await getDocs(studentsRef);
-      const studentData = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      setStudents(studentData);
+      const studentSnap = await getDocs(studentsRef);
+      const rosterMap = {};
+      
+      studentSnap.docs.forEach(doc => {
+        rosterMap[doc.id] = { id: doc.id, ...doc.data() };
+      });
+
+      // 2. Fetch Sessions (Gameplay Data)
+      const sessionsRef = collection(db, "sessions");
+      // Optional: Query only relevant fields if possible, but for now fetch all to be safe
+      const sessionsSnap = await getDocs(sessionsRef);
+      
+      console.log(`Debug: Found ${studentSnap.size} students and ${sessionsSnap.size} sessions`);
+
+      // 3. Aggregate Session Data
+      const sessionStats = {}; // studentId -> { totalAccesses, scores, hasPlayed, ... }
+
+      sessionsSnap.docs.forEach(doc => {
+        const session = doc.data();
+        const sid = session.studentId;
+        
+        // Skip sessions without valid student ID or admin sessions if filtering needed
+        if (!sid) return;
+
+        if (!sessionStats[sid]) {
+          sessionStats[sid] = {
+            totalAccesses: 0,
+            scores: [],
+            hasPlayed: false,
+            // Keep track of latest section/meta if needed for non-roster students
+            section: session.section || "Unknown", 
+            sid: sid
+          };
+        }
+
+        sessionStats[sid].totalAccesses += 1;
+        
+        // Mark as played if they have a completed task or final score
+        // Or essentially if they created a session they "played" to some extent
+        // But let's check for meaningful progress if desired. 
+        // For now, any session = hasPlayed: true (matches original intent "Active Sessions")
+        sessionStats[sid].hasPlayed = true;
+
+        if (session.finalScore !== undefined) {
+          sessionStats[sid].scores.push({
+            total: session.finalScore,
+            learning: session.studentLearningScore,
+            timestamp: session.completedAt
+          });
+        }
+      });
+
+      // 4. Merge Data
+      // Start with all Roster students
+      const mergedData = Object.values(rosterMap).map(student => {
+        const stats = sessionStats[student.id] || {};
+        return {
+          ...student,
+          ...stats, // Overwrite stale roster data with fresh session aggregated data
+          // Ensure scores is an array
+          scores: stats.scores || student.scores || [],
+          // Ensure totalAccesses is summed or taken from stats
+          totalAccesses: stats.totalAccesses || 0,
+          hasPlayed: stats.hasPlayed || false
+        };
+      });
+
+      // Add students who are in Sessions but NOT in Roster (e.g. experimental/test users)
+      Object.keys(sessionStats).forEach(sid => {
+        if (!rosterMap[sid]) {
+          mergedData.push({
+            id: sid,
+            sid: sid, // Maintain consistency with table expecting 'sid' field sometimes
+            ...sessionStats[sid]
+          });
+        }
+      });
+
+      setStudents(mergedData);
     } catch (error) {
       console.error("Error fetching students:", error);
     } finally {
