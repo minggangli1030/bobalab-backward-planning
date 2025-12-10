@@ -319,6 +319,26 @@ function App() {
     localStorage.setItem("categoryPoints", JSON.stringify(categoryPoints));
   }, [categoryPoints]);
 
+  // Periodic refresh for score updates (every 3s)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      // Force re-render to update score if interest/penalties changed
+      setTick(t => t + 1);
+    }, 3000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const [tick, setTick] = useState(0);
+
+  // Initial load effect
+  useEffect(() => {
+    // Check for restoration
+    const restored = restoreSession();
+    if (restored) {
+      console.log("Session restored!");
+    }
+  }, []);
+
   useEffect(() => {
     localStorage.setItem(
       "studentLearningScore",

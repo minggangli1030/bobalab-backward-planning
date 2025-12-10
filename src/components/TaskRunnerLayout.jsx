@@ -219,7 +219,7 @@ export default function TaskRunnerLayout({
       {/* Main Content Area - 3 Column Grid */}
       <div className="task-runner-layout" style={{ 
         display: 'grid', 
-        gridTemplateColumns: '320px 1fr 320px', // Adjusted widths
+        gridTemplateColumns: '260px 1fr 320px', // Adjusted widths: Left (Jars) narrower, Middle takes remaining
         gap: '20px', 
         height: 'calc(100vh - 140px)', 
         boxSizing: 'border-box'
