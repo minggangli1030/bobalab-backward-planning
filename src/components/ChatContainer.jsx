@@ -864,8 +864,9 @@ Typing: "${help.text.substring(
             Student Learning: {Math.round(calculateStudentLearning())} pts
           </div>
           <div style={{ fontSize: "10px", color: "#666", marginTop: "2px" }}>
-            {(categoryPoints?.materials || 0)} ×{" "}
-            {(1 + (categoryPoints?.research || 0) * 0.15).toFixed(2)} + Interest
+             Mat: {(categoryPoints?.materials || 0)} × {(1 + (categoryPoints?.research || 0) * 0.15).toFixed(2)} 
+             {categoryPoints?.bonus ? ` ${categoryPoints.bonus >= 0 ? '+' : '-'} ${Math.abs(categoryPoints.bonus)} (Penalties)` : ''} 
+             + Interest
           </div>
         </div>
       </div>

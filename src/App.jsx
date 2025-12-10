@@ -541,7 +541,7 @@ function App() {
     const accumulatedInterest =
       parseFloat(localStorage.getItem("engagementInterest") || "0") || 0;
 
-    const total = materialsScore + accumulatedInterest;
+    const total = materialsScore + accumulatedInterest + (points.bonus || 0);
 
     // Student Learning Points Update with new formula display
     const totalMaterials = points.materials || 0;
@@ -2949,6 +2949,8 @@ function App() {
               onToggle={() => setIsChatOpen(!isChatOpen)}
               unreadCount={unreadCount}
               aiDelay={globalConfig.aiDelay}
+              currentTask={taskQueue[currentTaskIndex]} // Pass current task
+              categoryPoints={categoryPoints} // Pass points
             />
           }
         >
