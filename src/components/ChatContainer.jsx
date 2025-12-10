@@ -451,6 +451,8 @@ export default function ChatContainer({
     },
   ]);
   const [input, setInput] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [progress, setProgress] = useState(0);
   const [isTyping, setIsTyping] = useState(false);
   const [lastHelpTime, setLastHelpTime] = useState({
     materials: 0,
@@ -737,12 +739,11 @@ Typing: "${help.text.substring(
               0,
               30
             )}${help.text.length > 30 ? "..." : ""}"`,
-          },
-        ]);
       }
-    } else {
-      const [isLoading, setIsLoading] = useState(false);
-  const [progress, setProgress] = useState(0);
+    ]);
+      }
+    }
+  };
 
   // Scroll to bottom on new messages
   useEffect(() => {
@@ -751,9 +752,8 @@ Typing: "${help.text.substring(
     }
   }, [messages]);
 
-  const handleSendMessage = async (e) => {
-    e.preventDefault();
-    if (!inputMessage.trim() || isLoading) return;
+  const handleSend = async () => {
+    if (!input.trim() || isLoading) return;
 
     // Check if user has enough points
     if (aiCost > 0 && points < aiCost) {
@@ -767,12 +767,12 @@ Typing: "${help.text.substring(
 
     const userMsg = {
       id: Date.now(),
-      text: inputMessage,
+      text: input,
       sender: "user",
     };
 
     setMessages((prev) => [...prev, userMsg]);
-    setInputMessage("");
+    setInput("");
     setIsLoading(true);
     setProgress(0);
 
@@ -1122,6 +1122,4 @@ Typing: "${help.text.substring(
       )}
     </div>
   );
-}
-}
 }

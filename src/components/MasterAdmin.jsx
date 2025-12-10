@@ -90,7 +90,7 @@ export default function MasterAdmin({ onClose }) {
       console.log(`Debug: Found ${studentSnap.size} students and ${sessionsSnap.size} sessions`);
 
       // 3. Aggregate Session Data
-      const sessionStats = {}; // studentId -> { totalAccesses, scores, hasPlayed, ... }
+      const sessionStats = {}; // studentId -> { totalAccesses, scores, hasPlayed, lastPlayed... }
 
       sessionsSnap.docs.forEach(doc => {
         const session = doc.data();
@@ -104,6 +104,7 @@ export default function MasterAdmin({ onClose }) {
             totalAccesses: 0,
             scores: [],
             hasPlayed: false,
+            lastPlayed: null, // Track last played time
             // Keep track of latest section/meta if needed for non-roster students
             section: session.section || "Unknown", 
             sid: sid
@@ -117,6 +118,12 @@ export default function MasterAdmin({ onClose }) {
         // But let's check for meaningful progress if desired. 
         // For now, any session = hasPlayed: true (matches original intent "Active Sessions")
         sessionStats[sid].hasPlayed = true;
+
+        // Track latest session time
+        const sessionTime = session.startTime?.toDate ? session.startTime.toDate() : new Date(session.clientStartTime || 0);
+        if (!sessionStats[sid].lastPlayed || sessionTime > sessionStats[sid].lastPlayed) {
+          sessionStats[sid].lastPlayed = sessionTime;
+        }
 
         if (session.finalScore !== undefined) {
           sessionStats[sid].scores.push({
@@ -138,7 +145,8 @@ export default function MasterAdmin({ onClose }) {
           scores: stats.scores || student.scores || [],
           // Ensure totalAccesses is summed or taken from stats
           totalAccesses: stats.totalAccesses || 0,
-          hasPlayed: stats.hasPlayed || false
+          hasPlayed: stats.hasPlayed || false,
+          lastPlayed: stats.lastPlayed || null
         };
       });
 
@@ -151,6 +159,13 @@ export default function MasterAdmin({ onClose }) {
             ...sessionStats[sid]
           });
         }
+      });
+
+      // Sort by Last Played (Descending)
+      mergedData.sort((a, b) => {
+        const timeA = a.lastPlayed ? a.lastPlayed.getTime() : 0;
+        const timeB = b.lastPlayed ? b.lastPlayed.getTime() : 0;
+        return timeB - timeA;
       });
 
       setStudents(mergedData);
@@ -429,6 +444,7 @@ export default function MasterAdmin({ onClose }) {
                     <th style={{ padding: "12px", borderBottom: "2px solid #ddd", fontSize: "13px" }}>Student ID</th>
                     <th style={{ padding: "12px", borderBottom: "2px solid #ddd", fontSize: "13px" }}>Section</th>
                     <th style={{ padding: "12px", borderBottom: "2px solid #ddd", fontSize: "13px" }}>Has Played</th>
+                    <th style={{ padding: "12px", borderBottom: "2px solid #ddd", fontSize: "13px" }}>Last Played</th>
                     <th style={{ padding: "12px", borderBottom: "2px solid #ddd", fontSize: "13px" }}>Total Accesses</th>
                     <th style={{ padding: "12px", borderBottom: "2px solid #ddd", fontSize: "13px" }}>Highest Score</th>
                   </tr>
@@ -449,6 +465,9 @@ export default function MasterAdmin({ onClose }) {
                         }}>
                           {student.hasPlayed ? "Yes" : "No"}
                         </span>
+                      </td>
+                      <td style={{ padding: "12px", fontSize: "13px", color: "#666" }}>
+                        {student.lastPlayed ? new Date(student.lastPlayed).toLocaleString() : "-"}
                       </td>
                       <td style={{ padding: "12px", fontSize: "13px", fontWeight: "600" }}>{student.totalAccesses || 0}</td>
                       <td style={{ padding: "12px", fontSize: "13px", fontWeight: "600", color: "#2196F3" }}>
