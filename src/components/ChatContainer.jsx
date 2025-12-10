@@ -864,8 +864,8 @@ Typing: "${help.text.substring(
             Student Learning: {Math.round(calculateStudentLearning())} pts
           </div>
           <div style={{ fontSize: "10px", color: "#666", marginTop: "2px" }}>
-            {categoryPoints.materials || 0} ×{" "}
-            {(1 + (categoryPoints.research || 0) * 0.15).toFixed(2)} + Interest
+            {(categoryPoints?.materials || 0)} ×{" "}
+            {(1 + (categoryPoints?.research || 0) * 0.15).toFixed(2)} + Interest
           </div>
         </div>
       </div>
