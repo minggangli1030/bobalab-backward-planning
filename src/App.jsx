@@ -330,14 +330,7 @@ function App() {
 
   const [tick, setTick] = useState(0);
 
-  // Initial load effect
-  useEffect(() => {
-    // Check for restoration
-    const restored = restoreSession();
-    if (restored) {
-      console.log("Session restored!");
-    }
-  }, []);
+
 
   useEffect(() => {
     localStorage.setItem(
