@@ -151,7 +151,7 @@ export default function TaskRunnerLayout({
   };
   
   return (
-    <div style={{ maxWidth: '1600px', margin: '0 auto', padding: '20px' }}>
+    <div style={{ maxWidth: '95vw', margin: '0 auto', padding: '20px' }}>
       {/* Header */}
       <div style={{
         display: 'flex',
@@ -219,7 +219,7 @@ export default function TaskRunnerLayout({
       {/* Main Content Area - 3 Column Grid */}
       <div className="task-runner-layout" style={{ 
         display: 'grid', 
-        gridTemplateColumns: '260px 1fr 320px', // Adjusted widths: Left (Jars) narrower, Middle takes remaining
+        gridTemplateColumns: '300px 1fr 340px', // Adjusted: Left 300px, Right 340px, Middle takes rest (wide)
         gap: '20px', 
         height: 'calc(100vh - 140px)', 
         boxSizing: 'border-box'

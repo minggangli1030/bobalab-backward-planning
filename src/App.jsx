@@ -319,12 +319,16 @@ function App() {
     localStorage.setItem("categoryPoints", JSON.stringify(categoryPoints));
   }, [categoryPoints]);
 
-  // Periodic refresh for score updates (every 3s)
+  // Periodic refresh for score updates (every 2s)
   useEffect(() => {
     const interval = setInterval(() => {
       // Force re-render to update score if interest/penalties changed
       setTick(t => t + 1);
-    }, 3000);
+      
+      // Explicitly update the score state
+      const currentScore = calculateStudentLearning();
+      setStudentLearningScore(currentScore);
+    }, 2000);
     return () => clearInterval(interval);
   }, []);
 
@@ -2879,10 +2883,10 @@ function App() {
       setTimeout(() => {
         setGameBlocked(false);
         setAccessDeniedReason("");
-        addTasksToQueue(type, 3); // Add 3 tasks
+        addTasksToQueue(type, 1); // Add 1 task
       }, globalConfig.jarRefillFreezeTime * 1000);
     } else {
-      addTasksToQueue(type, 3);
+      addTasksToQueue(type, 1);
     }
   };
 
