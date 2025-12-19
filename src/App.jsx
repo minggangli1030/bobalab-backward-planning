@@ -1126,8 +1126,8 @@ function App() {
     }
 
     // Calculate materials score with new formula: Materials × (1 + Research×0.15)
-    const totalMaterials = finalCategoryPoints.materials || 0;
-    const researchPoints = finalCategoryPoints.research || 0;
+    const totalMaterials = newCategoryPoints.materials || 0;
+    const researchPoints = newCategoryPoints.research || 0;
     const materialsScore = totalMaterials * (1 + researchPoints * 0.15);
 
     // Add engagement interest to accumulated interest
