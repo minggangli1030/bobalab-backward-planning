@@ -84,6 +84,8 @@ function App() {
   const [randomSeed, setRandomSeed] = useState(null);
   const [checkpointReached, setCheckpointReached] = useState(false);
   const [checkpointBonus, setCheckpointBonus] = useState(0);
+  // Pre-generated slider patterns for consistent sequences
+  const [sliderPatterns, setSliderPatterns] = useState({});
   const [currentPractice, setCurrentPractice] = useState(null);
   const [practiceCompleted, setPracticeCompleted] = useState({
     g2t1: false, // Materials (was slider)
@@ -110,7 +112,13 @@ function App() {
   const [materialsAtResearchLevel, setMaterialsAtResearchLevel] = useState({});
   const [taskAttempts, setTaskAttempts] = useState({});
   const [taskPoints, setTaskPoints] = useState({});
-  
+  // Track penalties for display
+  const [penalties, setPenalties] = useState({
+    switch: 0, // Total switch penalties
+    refill: 0, // Total refill penalties
+    unfinished: 0, // Unfinished task penalties
+  });
+
   // Global Game Configuration
   const [globalConfig, setGlobalConfig] = useState({
     semesterDuration: 12,
@@ -126,7 +134,29 @@ function App() {
     switchCost: 0,
     jarRefillFreezeTime: 0,
     unfinishedJarPenalty: 0,
-    aiDelay: 0
+    aiDelay: 0,
+    gameMode: "knapsack", // "knapsack" or "sequential"
+    // Scoring configuration: 3 tasks × 3 difficulties × 2 scores = 18 variables
+    scoring: {
+      g1: {
+        // Research (Counting)
+        easy: { fullCorrect: 2, halfCorrect: 1 },
+        medium: { fullCorrect: 2, halfCorrect: 1 },
+        hard: { fullCorrect: 2, halfCorrect: 1 },
+      },
+      g2: {
+        // Materials (Slider)
+        easy: { fullCorrect: 2, halfCorrect: 1 },
+        medium: { fullCorrect: 2, halfCorrect: 1 },
+        hard: { fullCorrect: 2, halfCorrect: 1 },
+      },
+      g3: {
+        // Engagement (Typing)
+        easy: { fullCorrect: 2, halfCorrect: 1 },
+        medium: { fullCorrect: 2, halfCorrect: 1 },
+        hard: { fullCorrect: 2, halfCorrect: 1 },
+      },
+    },
   });
 
   // Load global config on mount
@@ -137,8 +167,8 @@ function App() {
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
           const data = docSnap.data();
-          setGlobalConfig(prev => ({ ...prev, ...data }));
-          
+          setGlobalConfig((prev) => ({ ...prev, ...data }));
+
           // Apply time settings immediately
           if (data.semesterDuration) {
             const durationSeconds = data.semesterDuration * 60;
@@ -160,7 +190,7 @@ function App() {
   const [currentTaskIndex, setCurrentTaskIndex] = useState(0);
   const [allocationCounts, setAllocationCounts] = useState(null);
   const [isBonusRound, setIsBonusRound] = useState(false);
-  
+
   // Chat State
   const [chatMessages, setChatMessages] = useState([]);
   const [isAiTyping, setIsAiTyping] = useState(false);
@@ -179,7 +209,8 @@ function App() {
 
   // Helper function to get checkpoint timing for display
   const getCheckpointMinutes = () => {
-    const semesterDurationMs = (globalConfig.semesterDuration || 12) * 60 * 1000;
+    const semesterDurationMs =
+      (globalConfig.semesterDuration || 12) * 60 * 1000;
     const checkpointTimeSeconds = Math.floor(semesterDurationMs / 2000); // Half duration in seconds
     return Math.floor(checkpointTimeSeconds / 60); // Convert to minutes for display
   };
@@ -323,8 +354,8 @@ function App() {
   useEffect(() => {
     const interval = setInterval(() => {
       // Force re-render to update score if interest/penalties changed
-      setTick(t => t + 1);
-      
+      setTick((t) => t + 1);
+
       // Explicitly update the score state
       const currentScore = calculateStudentLearning();
       setStudentLearningScore(currentScore);
@@ -333,8 +364,6 @@ function App() {
   }, []);
 
   const [tick, setTick] = useState(0);
-
-
 
   useEffect(() => {
     localStorage.setItem(
@@ -527,11 +556,19 @@ function App() {
   if (window.location.search.includes("master=true")) {
     const config = JSON.parse(sessionStorage.getItem("gameConfig") || "{}");
     if (config.role === "master_admin") {
-      return <MasterAdmin onClose={() => {
-        // Clear URL params and reload to truly exit admin mode
-        window.history.replaceState({}, document.title, window.location.pathname);
-        window.location.reload();
-      }} />;
+      return (
+        <MasterAdmin
+          onClose={() => {
+            // Clear URL params and reload to truly exit admin mode
+            window.history.replaceState(
+              {},
+              document.title,
+              window.location.pathname
+            );
+            window.location.reload();
+          }}
+        />
+      );
     }
   }
 
@@ -646,7 +683,8 @@ function App() {
 
       if (checkpointEnabled) {
         // Dynamic checkpoint time: semester duration / 2
-        const semesterDurationMs = (globalConfig.semesterDuration || 12) * 60 * 1000;
+        const semesterDurationMs =
+          (globalConfig.semesterDuration || 12) * 60 * 1000;
         const checkpointTime = Math.floor(semesterDurationMs / 2000); // Half duration in seconds
 
         if (elapsedSeconds === checkpointTime && !checkpointReached) {
@@ -699,11 +737,28 @@ function App() {
       setRandomSeed(seed);
       patternGenerator.initializeSeed(seed);
 
+      // Pre-generate all slider patterns (1-100) for this user
+      const patterns = {};
+      for (let level = 1; level <= 100; level++) {
+        patterns[level] = patternGenerator.generateSliderPattern(level);
+      }
+      setSliderPatterns(patterns);
+
       if (sessionId && !sessionId.startsWith("offline-")) {
         updateDoc(doc(db, "sessions", sessionId), {
           randomSeed: seed,
           [`semesterSeeds.semester${currentSemester}`]: seed,
         });
+      }
+    } else {
+      // If seed already exists, regenerate patterns if not already stored
+      if (Object.keys(sliderPatterns).length === 0) {
+        patternGenerator.initializeSeed(randomSeed);
+        const patterns = {};
+        for (let level = 1; level <= 100; level++) {
+          patterns[level] = patternGenerator.generateSliderPattern(level);
+        }
+        setSliderPatterns(patterns);
       }
     }
 
@@ -712,97 +767,142 @@ function App() {
     setCategoryPoints({ materials: 0, research: 0, engagement: 0, bonus: 0 });
     setMaterialsAtResearchLevel({});
 
-    // NEW: Go to allocation screen first
-    setMode("allocation");
-    
-    // Reset other states
-    setCompleted({});
-    setCompletedLevels(0);
-    setSwitches(0);
-    setBonusPrompts(0);
-    setCheckpointReached(false);
-    setTaskAttempts({});
-    setTaskPoints({});
-    
-    // Timer will be started after allocation
+    // Check game mode
+    const currentGameMode = globalConfig.gameMode || "knapsack";
+
+    if (currentGameMode === "sequential") {
+      // SEQUENTIAL MODE: Infinite levels, countdown timer
+      setMode("challenge");
+      setCurrentTab("g2t1"); // Start with materials
+      setCompleted({});
+      setCompletedLevels(0);
+      setSwitches(0);
+      setBonusPrompts(0);
+      setCheckpointReached(false);
+      setTaskAttempts({});
+      setTaskPoints({});
+      setPenalties({ switch: 0, refill: 0, unfinished: 0 });
+
+      // Start timer immediately
+      startTimer();
+    } else {
+      // KNAPSACK MODE: Go to allocation screen first
+      // NEW: Go to allocation screen first
+      setMode("allocation");
+
+      // Reset other states
+      setCompleted({});
+      setCompletedLevels(0);
+      setSwitches(0);
+      setBonusPrompts(0);
+      setCheckpointReached(false);
+      setTaskAttempts({});
+      setTaskPoints({});
+      setPenalties({ switch: 0, refill: 0, unfinished: 0 });
+
+      // Timer will be started after allocation
+    }
   };
 
+  // ============================================================================
+  // KNAPSACK MODE FUNCTIONS (Only used when gameMode === "knapsack")
+  // ============================================================================
+  // These functions handle task allocation, queue management, and task switching
+  // in knapsack mode. They are NOT used in sequential mode.
+  // ============================================================================
+
   const handleAllocationStart = (queue, counts) => {
+    // KNAPSACK MODE ONLY: Initialize task queue from allocation screen
     setTaskQueue(queue);
     setAllocationCounts(counts);
     setCurrentTaskIndex(0);
     setMode("challenge");
-    
+
     // Determine first task ID
     const firstType = queue[0];
     // Since it's start, all levels are 1
     const firstTab = `${firstType}t1`;
     setCurrentTab(firstTab);
-    
+
     setTaskStartTimes({ [firstTab]: Date.now() });
     eventTracker.setPageStartTime(firstTab);
-    
+
     // Start global timer
     startTimer();
-    
+
     eventTracker.logEvent("allocation_complete", {
       counts,
       queue,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     });
   };
 
   const handleSwitchTask = (targetType) => {
+    // KNAPSACK MODE ONLY: Switch between task types in the queue
     // 1. Identify current task type
     const currentType = taskQueue[currentTaskIndex].substring(0, 2); // e.g., 'g1'
-    if (currentType === targetType) return; 
+    if (currentType === targetType) return;
 
     // 2. Apply Switch Cost
     const cost = globalConfig.switchCost || 0;
     if (cost > 0) {
-       // Deduct from bonus or create a penalty state? 
-       // Let's deduct from bonus for now, or just track it.
-       // The user request said "Knapsack - people can deviate from original plan but with a cost"
-       // Let's subtract from total score (bonus)
-       setCategoryPoints(prev => ({
-         ...prev,
-         bonus: (prev.bonus || 0) - cost
-       }));
-       showNotification(`Switching tasks cost ${cost} points!`);
+      // Deduct from bonus or create a penalty state?
+      // Let's deduct from bonus for now, or just track it.
+      // The user request said "Knapsack - people can deviate from original plan but with a cost"
+      // Let's subtract from total score (bonus)
+      setCategoryPoints((prev) => ({
+        ...prev,
+        bonus: (prev.bonus || 0) - cost,
+      }));
+      setPenalties((prev) => ({
+        ...prev,
+        switch: prev.switch + cost,
+      }));
+      showNotification(`Switching tasks cost ${cost} points!`);
     }
 
     const newQueue = [...taskQueue];
-    
+
     // 3. Move ALL remaining tasks of currentType to the end
     //    Move ALL tasks of targetType to current position
     //    Preserve internal order (Easy -> Medium -> Hard)
-    
+
     // Get all items starting from current index
     const remainingQueue = newQueue.slice(currentTaskIndex);
     const pastQueue = newQueue.slice(0, currentTaskIndex);
-    
-    const currentTypeItems = remainingQueue.filter(id => id.startsWith(currentType));
-    const targetTypeItems = remainingQueue.filter(id => id.startsWith(targetType));
-    const otherItems = remainingQueue.filter(id => !id.startsWith(currentType) && !id.startsWith(targetType));
-    
+
+    const currentTypeItems = remainingQueue.filter((id) =>
+      id.startsWith(currentType)
+    );
+    const targetTypeItems = remainingQueue.filter((id) =>
+      id.startsWith(targetType)
+    );
+    const otherItems = remainingQueue.filter(
+      (id) => !id.startsWith(currentType) && !id.startsWith(targetType)
+    );
+
     // Reconstruct queue:
     // [Past Items] + [Target Items] + [Other Items] + [Current Type Items]
     // Wait, "switch to a different pool/jar... need to finish all of jar B before returning back to A"
     // So B comes first, then others, then A? Or just swap A and B blocks?
     // "switching from task A to task B will make it becomes B1, B2, A1, A2" (assuming others are after)
     // So we put Target First, then Current Last (of the active set).
-    
-    const reorderedRemaining = [...targetTypeItems, ...otherItems, ...currentTypeItems];
-    
+
+    const reorderedRemaining = [
+      ...targetTypeItems,
+      ...otherItems,
+      ...currentTypeItems,
+    ];
+
     const finalQueue = [...pastQueue, ...reorderedRemaining];
-    
+
     setTaskQueue(finalQueue);
-    setSwitches(prev => prev + 1);
-    
+    setSwitches((prev) => prev + 1);
+
     // Update Current Tab to the first item of the new block (which is the first of targetTypeItems)
     if (targetTypeItems.length > 0) {
-        const newTab = targetTypeItems[0];
-        handleTabSwitch(newTab);
+      const newTab = targetTypeItems[0];
+      handleTabSwitch(newTab);
     }
   };
 
@@ -819,56 +919,64 @@ function App() {
       ? "materials"
       : "engagement";
 
-    // DEBUGGING
+    // Determine task type (g1, g2, g3) and difficulty (easy, medium, hard)
+    const taskType = tabId.startsWith("g1")
+      ? "g1"
+      : tabId.startsWith("g2")
+      ? "g2"
+      : "g3";
+    const taskNum = parseInt(tabId.substring(3)) || 1;
+    // Difficulty mapping: 1-5 = easy, 6-10 = medium, 11+ = hard
+    const difficulty =
+      taskNum <= 5 ? "easy" : taskNum <= 10 ? "medium" : "hard";
+
+    // Get configured scoring values
+    const scoringConfig = globalConfig.scoring?.[taskType]?.[difficulty] || {
+      fullCorrect: 2,
+      halfCorrect: 1,
+    };
+    const fullCorrectPoints = scoringConfig.fullCorrect || 2;
+    const halfCorrectPoints = scoringConfig.halfCorrect || 1;
+
+    // Determine if answer is full correct or half correct
+    let isFullCorrect = false;
+    let isHalfCorrect = false;
 
     if (category === "materials") {
-      // Slider: exact = 2 points, within 1 = 1 point
-      // Use points from data if available, otherwise calculate
-      if (data.points !== undefined) {
-        points = data.points;
-      } else {
-        const userValue = parseFloat(data.userAnswer || data.userValue || 0);
-        const targetValue = parseFloat(
-          data.correctAnswer || data.targetValue || 0
-        );
-        const diff = Math.abs(userValue - targetValue);
-
-        if (diff === 0) points = 2;
-        else if (diff <= 1) points = 1;
-        else points = 0;
-      }
+      // Slider: check accuracy
+      const userValue = parseFloat(data.userAnswer || data.userValue || 0);
+      const targetValue = parseFloat(
+        data.correctAnswer || data.targetValue || 0
+      );
+      const diff = Math.abs(userValue - targetValue);
+      isFullCorrect = diff === 0;
+      isHalfCorrect = diff > 0 && diff <= 1;
     } else if (category === "research") {
-      // Counting: exact = 2 points, within 1 = 1 point
-      // Use points from data if available, otherwise calculate
-      if (data.points !== undefined) {
-        points = data.points;
-      } else {
-        const userCount = parseInt(data.userAnswer || 0);
-        const correctCount = parseInt(data.correctAnswer || 0);
-        const diff = Math.abs(userCount - correctCount);
-
-        if (diff === 0) points = 2;
-        else if (diff <= 1) points = 1;
-        else points = 0;
-      }
+      // Counting: check accuracy
+      const userCount = parseInt(data.userAnswer || 0);
+      const correctCount = parseInt(data.correctAnswer || 0);
+      const diff = Math.abs(userCount - correctCount);
+      isFullCorrect = diff === 0;
+      isHalfCorrect = diff > 0 && diff <= 1;
     } else if (category === "engagement") {
-      // Typing: exact = 2 points, one typo = 1 point
-      // Use points from data if available, otherwise calculate
-      if (data.points !== undefined) {
-        points = data.points;
+      // Typing: check accuracy
+      const userText = data.userAnswer || "";
+      const correctText = data.correctAnswer || "";
+      if (userText === correctText) {
+        isFullCorrect = true;
       } else {
-        const userText = data.userAnswer || "";
-        const correctText = data.correctAnswer || "";
-
-        if (userText === correctText) {
-          points = 2;
-        } else {
-          // Check if only one character difference (Levenshtein distance = 1)
-          const distance = calculateLevenshteinDistance(userText, correctText);
-          if (distance === 1) points = 1;
-          else points = 0;
-        }
+        const distance = calculateLevenshteinDistance(userText, correctText);
+        isHalfCorrect = distance === 1;
       }
+    }
+
+    // Apply configured scoring
+    if (isFullCorrect) {
+      points = fullCorrectPoints;
+    } else if (isHalfCorrect) {
+      points = halfCorrectPoints;
+    } else {
+      points = 0;
     }
 
     // Store raw points for the category
@@ -1030,46 +1138,76 @@ function App() {
       });
     }
 
-    // Auto-advance logic for Queue System
-    const nextIndex = currentTaskIndex + 1;
-    
-    if (nextIndex < taskQueue.length) {
-      setCurrentTaskIndex(nextIndex);
-      
-      const nextType = taskQueue[nextIndex];
-      // Calculate level
-      // Note: we just added to completed, so count includes the one just finished if it was same type
-      // But we need to be careful. `completed` update might not be reflected immediately in `completed` state variable if we use it here?
-      // Actually `setCompleted` is async-ish (batch update). 
-      // Better to use the local `completed` plus the one we just added.
-      
-      // Count completed of nextType
-      let count = Object.keys(completed).filter(k => k.startsWith(nextType)).length;
-      if (nextType === tabId.substring(0, 2)) {
-         // If next type is same as current, we just finished one, so count is correct (assuming completed not updated yet? No, React state...)
-         // Safest is to calculate from scratch or increment.
-         // If we just finished g2t1, and next is g2, we want g2t2.
-         // If we just finished g2t1, and next is g1, we want g1t(completed_g1 + 1).
-         
-         // Let's use the updated `completed` logic:
-         // We know we just finished `tabId`.
-         if (tabId.startsWith(nextType)) {
-             count += 1;
-         }
+    // Check game mode
+    const currentGameMode = globalConfig.gameMode || "knapsack";
+
+    if (currentGameMode === "sequential") {
+      // SEQUENTIAL MODE: Auto-advance to next level of same type, or next type
+      const currentType = tabId.substring(0, 2); // e.g., 'g2'
+      const currentLevel = parseInt(tabId.substring(3)) || 1;
+
+      // Check if there's a next level of the same type
+      if (currentLevel < 100) {
+        // Continue with next level of same type
+        const nextTab = `${currentType}t${currentLevel + 1}`;
+        handleTabSwitch(nextTab, true);
+      } else {
+        // Move to next task type, level 1
+        const typeOrder = ["g2", "g1", "g3"]; // Materials, Research, Engagement
+        const currentTypeIndex = typeOrder.indexOf(currentType);
+        if (currentTypeIndex < typeOrder.length - 1) {
+          const nextType = typeOrder[currentTypeIndex + 1];
+          const nextTab = `${nextType}t1`;
+          handleTabSwitch(nextTab, true);
+        } else {
+          // All types completed, cycle back to Materials
+          const nextTab = "g2t1";
+          handleTabSwitch(nextTab, true);
+        }
       }
-      
-      const nextLevel = count + 1;
-      const nextTab = `${nextType}t${nextLevel}`;
-      
-      handleTabSwitch(nextTab, true);
-      
     } else {
-      // Queue finished!
-      // Check time
-      // Queue finished!
-      // Check time
-      // End game immediately (No bonus round)
-      handleGameComplete("all_tasks_done");
+      // KNAPSACK MODE: Auto-advance logic for Queue System
+      const nextIndex = currentTaskIndex + 1;
+
+      if (nextIndex < taskQueue.length) {
+        setCurrentTaskIndex(nextIndex);
+
+        const nextType = taskQueue[nextIndex];
+        // Calculate level
+        // Note: we just added to completed, so count includes the one just finished if it was same type
+        // But we need to be careful. `completed` update might not be reflected immediately in `completed` state variable if we use it here?
+        // Actually `setCompleted` is async-ish (batch update).
+        // Better to use the local `completed` plus the one we just added.
+
+        // Count completed of nextType
+        let count = Object.keys(completed).filter((k) =>
+          k.startsWith(nextType)
+        ).length;
+        if (nextType === tabId.substring(0, 2)) {
+          // If next type is same as current, we just finished one, so count is correct (assuming completed not updated yet? No, React state...)
+          // Safest is to calculate from scratch or increment.
+          // If we just finished g2t1, and next is g2, we want g2t2.
+          // If we just finished g2t1, and next is g1, we want g1t(completed_g1 + 1).
+
+          // Let's use the updated `completed` logic:
+          // We know we just finished `tabId`.
+          if (tabId.startsWith(nextType)) {
+            count += 1;
+          }
+        }
+
+        const nextLevel = count + 1;
+        const nextTab = `${nextType}t${nextLevel}`;
+
+        handleTabSwitch(nextTab, true);
+      } else {
+        // Queue finished!
+        // Check time
+        // Queue finished!
+        // Check time
+        // End game immediately (No bonus round)
+        handleGameComplete("all_tasks_done");
+      }
     }
   };
 
@@ -1153,15 +1291,30 @@ function App() {
 
     const finalStudentLearning = calculateStudentLearning();
     const totalBonus = categoryPoints.bonus || 0;
-    
+
     // Calculate Unfinished Penalty
-    const unfinishedCount = Math.max(0, globalConfig.totalTasks - Object.keys(completed).length);
-    const unfinishedPenalty = unfinishedCount * (globalConfig.unfinishedTaskPenalty || 0);
-    
-    const finalScore = Math.round(finalStudentLearning) + totalBonus - unfinishedPenalty;
-    
+    const unfinishedCount = Math.max(
+      0,
+      globalConfig.totalTasks - Object.keys(completed).length
+    );
+    const unfinishedPenalty =
+      unfinishedCount * (globalConfig.unfinishedTaskPenalty || 0);
+
+    // Update penalties state
     if (unfinishedPenalty > 0) {
-      console.log(`⚠️ Unfinished Penalty: -${unfinishedPenalty} pts (${unfinishedCount} tasks x ${globalConfig.unfinishedTaskPenalty})`);
+      setPenalties((prev) => ({
+        ...prev,
+        unfinished: unfinishedPenalty,
+      }));
+    }
+
+    const finalScore =
+      Math.round(finalStudentLearning) + totalBonus - unfinishedPenalty;
+
+    if (unfinishedPenalty > 0) {
+      console.log(
+        `⚠️ Unfinished Penalty: -${unfinishedPenalty} pts (${unfinishedCount} tasks x ${globalConfig.unfinishedTaskPenalty})`
+      );
     }
 
     await eventTracker.logEvent("game_complete", {
@@ -1208,50 +1361,56 @@ function App() {
 
     // AI Response
     setIsAiTyping(true);
-    
+
     // Calculate context for AI
     const context = {
       currentTask: currentTab,
       timeRemaining,
       score: Math.round(studentLearningScore),
       completedTasks: Object.keys(completed).length,
-      totalTasks: taskQueue.length
+      totalTasks: taskQueue.length,
     };
 
     try {
       // Simulate AI delay based on config
       const delay = (globalConfig.aiDelay || 0) * 1000;
-      
+
       // Get AI response
       const responseText = await aiTaskHelper.getAdvice(text, context);
-      
+
       setTimeout(() => {
-        const aiMsg = { sender: "ai", text: responseText, timestamp: Date.now() };
+        const aiMsg = {
+          sender: "ai",
+          text: responseText,
+          timestamp: Date.now(),
+        };
         setChatMessages((prev) => [...prev, aiMsg]);
         setIsAiTyping(false);
-        
+
         if (!isChatOpen) {
-          setUnreadCount(prev => prev + 1);
+          setUnreadCount((prev) => prev + 1);
         }
-        
+
         // Apply AI Cost if configured
         if (globalConfig.aiCost > 0) {
-           setCategoryPoints(prev => ({
-             ...prev,
-             bonus: (prev.bonus || 0) - globalConfig.aiCost
-           }));
-           showNotification(`AI Help Cost: -${globalConfig.aiCost} pts`);
+          setCategoryPoints((prev) => ({
+            ...prev,
+            bonus: (prev.bonus || 0) - globalConfig.aiCost,
+          }));
+          showNotification(`AI Help Cost: -${globalConfig.aiCost} pts`);
         }
       }, Math.max(1000, delay)); // Minimum 1s delay for realism
-      
     } catch (error) {
       console.error("AI Error:", error);
       setIsAiTyping(false);
-      setChatMessages((prev) => [...prev, { 
-        sender: "ai", 
-        text: "I'm having trouble connecting right now. Please try again.", 
-        timestamp: Date.now() 
-      }]);
+      setChatMessages((prev) => [
+        ...prev,
+        {
+          sender: "ai",
+          text: "I'm having trouble connecting right now. Please try again.",
+          timestamp: Date.now(),
+        },
+      ]);
     }
   };
 
@@ -1301,12 +1460,15 @@ function App() {
       );
     }
     if (game === "2") {
+      // Use pre-generated pattern if available, otherwise generate on the fly
+      const preGeneratedPattern = sliderPatterns[taskNum];
       return (
         <SliderTask
           taskNum={taskNum}
           onComplete={isPractice ? handlePracticeComplete : handleComplete}
           currentTaskId={currentTab}
           isPractice={isPractice}
+          preGeneratedPattern={preGeneratedPattern}
         />
       );
     }
@@ -1496,7 +1658,14 @@ function App() {
               onClick={() => {
                 // Reset for next semester
                 setCurrentSemester((prev) => prev + 1);
-                setMode("allocation"); // Go to allocation screen instead of challenge
+                // Check game mode
+                const currentGameMode = globalConfig.gameMode || "knapsack";
+                if (currentGameMode === "knapsack") {
+                  setMode("allocation"); // Go to allocation screen instead of challenge
+                } else {
+                  setMode("challenge"); // Sequential mode goes directly to challenge
+                  startTimer();
+                }
                 // Reset timer? Or keep cumulative? Usually reset for new semester.
                 // The allocation screen will call onStart which resets things.
 
@@ -1941,9 +2110,6 @@ function App() {
               Start Semester {currentSemester}
             </button>
 
-
-
-
             {isAdminMode && (
               <div
                 style={{
@@ -2367,9 +2533,7 @@ function App() {
       finalScore,
     };
 
-
-
-  const handleNextSemester = async () => {
+    const handleNextSemester = async () => {
       const newHistory = [...semesterHistory, semesterData];
       setSemesterHistory(newHistory);
       localStorage.setItem("engagementInterest", "0");
@@ -2405,6 +2569,13 @@ function App() {
       const newSeed = Math.floor(Math.random() * 1000000);
       setRandomSeed(newSeed);
       patternGenerator.initializeSeed(newSeed);
+
+      // Pre-generate all slider patterns for new semester
+      const patterns = {};
+      for (let level = 1; level <= 100; level++) {
+        patterns[level] = patternGenerator.generateSliderPattern(level);
+      }
+      setSliderPatterns(patterns);
     };
 
     const isLastSemester = currentSemester >= totalSemesters;
@@ -2568,36 +2739,7 @@ function App() {
             </div>
 
             {/* Only show checkpoint bonus in semester 2 or if bonus exists */}
-              {(currentSemester === 2 || totalBonus > 0) && (
-                <div
-                  style={{
-                    background: "#f8f9fa",
-                    padding: "20px",
-                    borderRadius: "8px",
-                    border: "2px solid #e0e0e0",
-                  }}
-                >
-                  <div
-                    style={{
-                      fontSize: "14px",
-                      color: "#666",
-                      marginBottom: "5px",
-                    }}
-                  >
-                    Checkpoint Bonus
-                  </div>
-                  <div
-                    style={{
-                      fontSize: "24px",
-                      fontWeight: "bold",
-                      color: "#333",
-                    }}
-                  >
-                    +{totalBonus}
-                  </div>
-                </div>
-              )}
-
+            {(currentSemester === 2 || totalBonus > 0) && (
               <div
                 style={{
                   background: "#f8f9fa",
@@ -2613,7 +2755,7 @@ function App() {
                     marginBottom: "5px",
                   }}
                 >
-                  Tasks Completed
+                  Checkpoint Bonus
                 </div>
                 <div
                   style={{
@@ -2622,177 +2764,201 @@ function App() {
                     color: "#333",
                   }}
                 >
-                  {completedLevels}
+                  +{totalBonus}
                 </div>
               </div>
-            </div>
+            )}
 
-            {/* Teaching Performance Breakdown */}
-            <h3 style={{ color: "#666", marginBottom: "15px" }}>
-              Teaching Performance by Category
-            </h3>
             <div
               style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr 1fr",
-                gap: "15px",
-                marginBottom: "30px",
+                background: "#f8f9fa",
+                padding: "20px",
+                borderRadius: "8px",
+                border: "2px solid #e0e0e0",
               }}
             >
               <div
                 style={{
-                  background: "#f0f8f0",
-                  padding: "15px",
-                  borderRadius: "6px",
-                  border: "2px solid #4CAF5020",
+                  fontSize: "14px",
+                  color: "#666",
+                  marginBottom: "5px",
                 }}
               >
-                <div
-                  style={{
-                    color: "#4CAF50",
-                    fontWeight: "bold",
-                    marginBottom: "5px",
-                  }}
-                >
-                  🎯 Materials
-                </div>
-                <div style={{ fontSize: "20px", fontWeight: "bold" }}>
-                  {categoryPoints.materials || 0}
-                </div>
-                <div style={{ fontSize: "12px", color: "#666" }}>
-                  Base points
-                </div>
+                Tasks Completed
               </div>
-
               <div
                 style={{
-                  background: "#f8f0ff",
-                  padding: "15px",
-                  borderRadius: "6px",
-                  border: "2px solid #9C27B020",
+                  fontSize: "24px",
+                  fontWeight: "bold",
+                  color: "#333",
                 }}
               >
-                <div
-                  style={{
-                    color: "#9C27B0",
-                    fontWeight: "bold",
-                    marginBottom: "5px",
-                  }}
-                >
-                  📚 Research
-                </div>
-                <div style={{ fontSize: "20px", fontWeight: "bold" }}>
-                  {categoryPoints.research || 0}
-                </div>
-                <div style={{ fontSize: "12px", color: "#666" }}>
-                  +{(categoryPoints.research || 0) * 15}% to future materials
-                </div>
-              </div>
-
-              <div
-                style={{
-                  background: "#fff0f0",
-                  padding: "15px",
-                  borderRadius: "6px",
-                  border: "2px solid #f4433620",
-                }}
-              >
-                <div
-                  style={{
-                    color: "#f44336",
-                    fontWeight: "bold",
-                    marginBottom: "5px",
-                  }}
-                >
-                  ✉️ Engagement
-                </div>
-                <div style={{ fontSize: "20px", fontWeight: "bold" }}>
-                  {categoryPoints.engagement || 0}
-                </div>
-                <div style={{ fontSize: "12px", color: "#666" }}>
-                  +{((categoryPoints.engagement || 0) * 0.15).toFixed(1)}%
-                  interest/task
-                </div>
+                {completedLevels}
               </div>
             </div>
           </div>
 
-          {/* Checkpoint Bonus Display - Only show in semester 2 if bonus earned */}
-          {currentSemester === 2 && categoryPoints.bonus > 0 && (
+          {/* Teaching Performance Breakdown */}
+          <h3 style={{ color: "#666", marginBottom: "15px" }}>
+            Teaching Performance by Category
+          </h3>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr 1fr",
+              gap: "15px",
+              marginBottom: "30px",
+            }}
+          >
             <div
               style={{
-                marginBottom: "20px",
+                background: "#f0f8f0",
                 padding: "15px",
-                background: "#fff3cd",
                 borderRadius: "6px",
-                border: "1px solid #ffc107",
+                border: "2px solid #4CAF5020",
               }}
             >
-              <strong style={{ color: "#856404" }}>
-                📚 Exam Season Bonus:{" "}
-              </strong>
-              <span
-                style={{
-                  fontSize: "18px",
-                  fontWeight: "bold",
-                  color: "#856404",
-                }}
-              >
-                +{categoryPoints.bonus} points
-              </span>
-            </div>
-          )}
-
-          {/* Semester history */}
-          {semesterHistory.length > 0 && (
-            <div
-              style={{
-                marginTop: "30px",
-                padding: "20px",
-                background: "#f8f9fa",
-                borderRadius: "8px",
-              }}
-            >
-              <h4 style={{ color: "#666", marginBottom: "15px" }}>
-                Progress Over Semesters
-              </h4>
               <div
                 style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fit, minmax(100px, 1fr))",
-                  gap: "10px",
+                  color: "#4CAF50",
+                  fontWeight: "bold",
+                  marginBottom: "5px",
                 }}
               >
-                {[...semesterHistory, semesterData].map((semester, idx) => (
-                  <div
-                    key={idx}
-                    style={{
-                      padding: "10px",
-                      background:
-                        idx === semesterHistory.length ? "#e3f2fd" : "white",
-                      borderRadius: "6px",
-                      border: "1px solid #e0e0e0",
-                      textAlign: "center",
-                    }}
-                  >
-                    <div style={{ fontSize: "12px", color: "#666" }}>
-                      Semester {idx + 1}
-                    </div>
-                    <div
-                      style={{
-                        fontSize: "18px",
-                        fontWeight: "bold",
-                        color: "#333",
-                      }}
-                    >
-                      {semester.finalScore}
-                    </div>
-                  </div>
-                ))}
+                🎯 Materials
+              </div>
+              <div style={{ fontSize: "20px", fontWeight: "bold" }}>
+                {categoryPoints.materials || 0}
+              </div>
+              <div style={{ fontSize: "12px", color: "#666" }}>Base points</div>
+            </div>
+
+            <div
+              style={{
+                background: "#f8f0ff",
+                padding: "15px",
+                borderRadius: "6px",
+                border: "2px solid #9C27B020",
+              }}
+            >
+              <div
+                style={{
+                  color: "#9C27B0",
+                  fontWeight: "bold",
+                  marginBottom: "5px",
+                }}
+              >
+                📚 Research
+              </div>
+              <div style={{ fontSize: "20px", fontWeight: "bold" }}>
+                {categoryPoints.research || 0}
+              </div>
+              <div style={{ fontSize: "12px", color: "#666" }}>
+                +{(categoryPoints.research || 0) * 15}% to future materials
               </div>
             </div>
-          )}
 
+            <div
+              style={{
+                background: "#fff0f0",
+                padding: "15px",
+                borderRadius: "6px",
+                border: "2px solid #f4433620",
+              }}
+            >
+              <div
+                style={{
+                  color: "#f44336",
+                  fontWeight: "bold",
+                  marginBottom: "5px",
+                }}
+              >
+                ✉️ Engagement
+              </div>
+              <div style={{ fontSize: "20px", fontWeight: "bold" }}>
+                {categoryPoints.engagement || 0}
+              </div>
+              <div style={{ fontSize: "12px", color: "#666" }}>
+                +{((categoryPoints.engagement || 0) * 0.15).toFixed(1)}%
+                interest/task
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Checkpoint Bonus Display - Only show in semester 2 if bonus earned */}
+        {currentSemester === 2 && categoryPoints.bonus > 0 && (
+          <div
+            style={{
+              marginBottom: "20px",
+              padding: "15px",
+              background: "#fff3cd",
+              borderRadius: "6px",
+              border: "1px solid #ffc107",
+            }}
+          >
+            <strong style={{ color: "#856404" }}>📚 Exam Season Bonus: </strong>
+            <span
+              style={{
+                fontSize: "18px",
+                fontWeight: "bold",
+                color: "#856404",
+              }}
+            >
+              +{categoryPoints.bonus} points
+            </span>
+          </div>
+        )}
+
+        {/* Semester history */}
+        {semesterHistory.length > 0 && (
+          <div
+            style={{
+              marginTop: "30px",
+              padding: "20px",
+              background: "#f8f9fa",
+              borderRadius: "8px",
+            }}
+          >
+            <h4 style={{ color: "#666", marginBottom: "15px" }}>
+              Progress Over Semesters
+            </h4>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(100px, 1fr))",
+                gap: "10px",
+              }}
+            >
+              {[...semesterHistory, semesterData].map((semester, idx) => (
+                <div
+                  key={idx}
+                  style={{
+                    padding: "10px",
+                    background:
+                      idx === semesterHistory.length ? "#e3f2fd" : "white",
+                    borderRadius: "6px",
+                    border: "1px solid #e0e0e0",
+                    textAlign: "center",
+                  }}
+                >
+                  <div style={{ fontSize: "12px", color: "#666" }}>
+                    Semester {idx + 1}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: "18px",
+                      fontWeight: "bold",
+                      color: "#333",
+                    }}
+                  >
+                    {semester.finalScore}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Next semester or finish button */}
         <div style={{ marginTop: "30px", textAlign: "center" }}>
@@ -2838,48 +3004,88 @@ function App() {
   }
 
   // Main challenge mode
-  // Allocation Screen
-  if (mode === "allocation") {
-    return <TaskAllocationScreen 
-      onStart={handleAllocationStart} 
-      totalTasks={globalConfig.totalTasks}
-      orderStrategy={globalConfig.taskOrderStrategy}
-      durationMinutes={globalConfig.semesterDuration}
-      difficultyMode={globalConfig.difficultyMode}
-    />;
-  }
+  // Check game mode
+  const currentGameMode = globalConfig.gameMode || "knapsack";
 
-  // Bonus Round Screen
-  if (mode === "bonus_round") {
+  // ============================================================================
+  // KNAPSACK MODE: Allocation Screen (only shown in knapsack mode)
+  // ============================================================================
+  // Sequential mode bypasses this and goes directly to challenge mode
+  // ============================================================================
+  if (mode === "allocation" && currentGameMode === "knapsack") {
     return (
-      <BonusRoundScreen 
-        timeRemaining={timeRemaining}
-        onSelectTask={(type) => {
-           // Add to queue and continue
-           const newQueue = [...taskQueue, type];
-           setTaskQueue(newQueue);
-           // currentTaskIndex is already at end (length of old queue)
-           // So it will point to this new item
-           
-           // Determine ID
-           const count = Object.keys(completed).filter(k => k.startsWith(type)).length;
-           const nextTab = `${type}t${count + 1}`;
-           
-           setMode("challenge");
-           handleTabSwitch(nextTab, true);
-        }}
-        onFinishEarly={() => handleGameComplete("finished_early")}
+      <TaskAllocationScreen
+        onStart={handleAllocationStart}
+        totalTasks={globalConfig.totalTasks}
+        orderStrategy={globalConfig.taskOrderStrategy}
+        durationMinutes={globalConfig.semesterDuration}
+        difficultyMode={globalConfig.difficultyMode}
       />
     );
   }
 
-   // Handle Refill Logic
+  // ============================================================================
+  // KNAPSACK MODE: Bonus Round Screen (only used in knapsack mode)
+  // ============================================================================
+  // Sequential mode doesn't have bonus rounds - infinite levels instead
+  // ============================================================================
+  if (mode === "bonus_round") {
+    // Only show bonus round in knapsack mode
+    if (currentGameMode === "knapsack") {
+      return (
+        <BonusRoundScreen
+          timeRemaining={timeRemaining}
+          onSelectTask={(type) => {
+            // Add to queue and continue
+            const newQueue = [...taskQueue, type];
+            setTaskQueue(newQueue);
+            // currentTaskIndex is already at end (length of old queue)
+            // So it will point to this new item
+
+            // Determine ID
+            const count = Object.keys(completed).filter((k) =>
+              k.startsWith(type)
+            ).length;
+            const nextTab = `${type}t${count + 1}`;
+
+            setMode("challenge");
+            handleTabSwitch(nextTab, true);
+          }}
+          onFinishEarly={() => handleGameComplete("finished_early")}
+        />
+      );
+    }
+  }
+
+  // KNAPSACK MODE ONLY: Handle Refill Logic (add tasks to queue)
   const handleRefillJar = (type) => {
+    // Track refill penalty if configured
+    const refillPenalty = globalConfig.unfinishedJarPenalty || 0;
+    if (refillPenalty > 0) {
+      setCategoryPoints((prev) => ({
+        ...prev,
+        bonus: (prev.bonus || 0) - refillPenalty,
+      }));
+      setPenalties((prev) => ({
+        ...prev,
+        refill: prev.refill + refillPenalty,
+      }));
+      showNotification(`Refilling jar cost ${refillPenalty} points!`);
+    }
+
     // 1. Check if frozen
     if (globalConfig.jarRefillFreezeTime > 0) {
       setGameBlocked(true);
-      setAccessDeniedReason(`Refilling ${type === 'g1' ? 'Research' : type === 'g2' ? 'Materials' : 'Engagement'} Jar...`);
-      
+      setAccessDeniedReason(
+        `Refilling ${
+          type === "g1"
+            ? "Research"
+            : type === "g2"
+            ? "Materials"
+            : "Engagement"
+        } Jar...`
+      );
+
       setTimeout(() => {
         setGameBlocked(false);
         setAccessDeniedReason("");
@@ -2890,63 +3096,105 @@ function App() {
     }
   };
 
+  // KNAPSACK MODE ONLY: Add tasks to the queue when refilling jars
   const addTasksToQueue = (type, count) => {
     // Generate new task IDs
     // We need to know the last ID used for this type to increment
     // Or just random/sequential. Let's use sequential based on existing queue + completed?
     // Simplified: just append new IDs.
-    
+
     // We need to find the max ID for this type currently in queue or completed
     // This is a bit complex to track perfectly without a counter state.
     // Let's just use a timestamp-based or simple increment if possible.
-    // Actually, let's just assume we continue from where we left off? 
+    // Actually, let's just assume we continue from where we left off?
     // But we don't track "next available ID" easily.
     // Let's just use a random difficulty distribution for the new tasks?
     // User didn't specify difficulty for refill. Let's assume balanced or random.
-    
+
     const newTasks = [];
     for (let i = 0; i < count; i++) {
-        // For now, just use a generic ID format or random difficulty
-        // Let's say we just add "refill" tasks.
-        // We need valid IDs like g1t1, g1t2 etc for the components to work?
-        // The components take `taskNum`.
-        // Let's generate random taskNum between 1 and 100 to avoid collisions/caching issues if any
-        const taskNum = Math.floor(Math.random() * 20) + 1; 
-        newTasks.push(`${type}t${taskNum}`);
+      // For now, just use a generic ID format or random difficulty
+      // Let's say we just add "refill" tasks.
+      // We need valid IDs like g1t1, g1t2 etc for the components to work?
+      // The components take `taskNum`.
+      // Let's generate random taskNum between 1 and 100 to avoid collisions/caching issues if any
+      const taskNum = Math.floor(Math.random() * 20) + 1;
+      newTasks.push(`${type}t${taskNum}`);
     }
-    
-    setTaskQueue(prev => [...prev, ...newTasks]);
+
+    setTaskQueue((prev) => [...prev, ...newTasks]);
   };
 
   // Render Task Runner
-  if (mode === "challenge" || mode === "bonus_round") {
+  // SEQUENTIAL MODE: Use NavTabsEnhanced layout
+  if (mode === "challenge" && currentGameMode === "sequential") {
+    return (
+      <div className="app">
+        <NavTabsEnhanced
+          current={currentTab}
+          completed={completed}
+          onSwitch={handleTabSwitch}
+          limitMode="time"
+          categoryPoints={categoryPoints}
+          timeRemaining={timeRemaining}
+        />
+        <div style={{ maxWidth: "1200px", margin: "0 auto", padding: "20px" }}>
+          {renderTask()}
+        </div>
+        <ChatContainer
+          messages={chatMessages}
+          onSendMessage={handleSendMessage}
+          isAiTyping={isAiTyping}
+          isOpen={isChatOpen}
+          onToggle={() => setIsChatOpen(!isChatOpen)}
+          unreadCount={unreadCount}
+          aiDelay={globalConfig.aiDelay}
+          currentTask={currentTab}
+          categoryPoints={categoryPoints}
+        />
+      </div>
+    );
+  }
+
+  // ============================================================================
+  // KNAPSACK MODE: Use TaskRunnerLayout with task jars and queue system
+  // ============================================================================
+  // This section is only rendered when gameMode === "knapsack"
+  // Sequential mode uses NavTabsEnhanced layout (see above)
+  // ============================================================================
+  if (
+    (mode === "challenge" || mode === "bonus_round") &&
+    currentGameMode === "knapsack"
+  ) {
     // ... (existing checks)
 
     return (
       <div className="app">
         {gameBlocked && (
-            <div style={{
-                position: 'fixed',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                background: 'rgba(0,0,0,0.7)',
-                zIndex: 9999,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'white',
-                fontSize: '24px',
-                flexDirection: 'column',
-                gap: '20px'
-            }}>
-                <div style={{ fontSize: '48px' }}>⏳</div>
-                <div>{accessDeniedReason}</div>
-                <div style={{ fontSize: '16px', opacity: 0.8 }}>Please wait...</div>
-            </div>
+          <div
+            style={{
+              position: "fixed",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: "rgba(0,0,0,0.7)",
+              zIndex: 9999,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "white",
+              fontSize: "24px",
+              flexDirection: "column",
+              gap: "20px",
+            }}
+          >
+            <div style={{ fontSize: "48px" }}>⏳</div>
+            <div>{accessDeniedReason}</div>
+            <div style={{ fontSize: "16px", opacity: 0.8 }}>Please wait...</div>
+          </div>
         )}
-      
+
         <TaskRunnerLayout
           currentTaskIndex={currentTaskIndex}
           totalTasks={taskQueue.length}
@@ -2957,6 +3205,7 @@ function App() {
           points={Math.round(studentLearningScore)}
           timeRemaining={timeRemaining}
           onTimeUp={() => handleGameComplete("time_up")}
+          penalties={penalties}
           chatInterface={
             <ChatContainer
               messages={chatMessages}
@@ -2975,8 +3224,6 @@ function App() {
         </TaskRunnerLayout>
       </div>
     );
-
-
   }
 }
 

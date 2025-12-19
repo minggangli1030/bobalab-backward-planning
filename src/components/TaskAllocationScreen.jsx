@@ -93,37 +93,51 @@ export default function TaskAllocationScreen({
 
     if (difficultyMode === 'fixed') {
       // Distribute 50/30/20 for each task type
+      // Improved algorithm to ensure accurate distribution
       ['g2', 'g1', 'g3'].forEach(type => {
         const count = simpleAllocation[type];
         if (count > 0) {
-          const easyCount = Math.round(count * 0.5);
-          const mediumCount = Math.round(count * 0.3);
-          const hardCount = count - easyCount - mediumCount;
+          // Calculate target counts for 50/30/20 distribution
+          const targetEasy = count * 0.5;
+          const targetMedium = count * 0.3;
+          const targetHard = count * 0.2;
           
-          // Handle potential negative hard count due to rounding
-          // (e.g. count=1 -> 1, 0, 0)
-          // Adjust logic to ensure sum equals count
+          // Use floor for initial allocation to avoid overshooting
+          let finalEasy = Math.floor(targetEasy);
+          let finalMedium = Math.floor(targetMedium);
+          let finalHard = Math.floor(targetHard);
           
-          // Better distribution logic:
-          // Fill Easy, then Medium, then Hard
-          let remaining = count;
-          const e = Math.ceil(count * 0.5); // Prioritize easy? Or round?
-          // Let's stick to strict rounding but adjust last bucket
-          // Actually, for small numbers, 50/30/20 is tricky.
-          // Let's use:
-          // Easy: round(0.5 * N)
-          // Medium: round(0.3 * N)
-          // Hard: Remainder
+          // Distribute remaining tasks to get as close to 50/30/20 as possible
+          let remaining = count - finalEasy - finalMedium - finalHard;
           
-          const finalEasy = Math.max(0, Math.round(count * 0.5));
-          const finalMedium = Math.max(0, Math.round(count * 0.3));
-          const finalHard = Math.max(0, count - finalEasy - finalMedium);
+          // Priority: fill in order of which is furthest from target
+          while (remaining > 0) {
+            const easyDiff = targetEasy - finalEasy;
+            const mediumDiff = targetMedium - finalMedium;
+            const hardDiff = targetHard - finalHard;
+            
+            // Find which category is furthest from its target
+            if (easyDiff >= mediumDiff && easyDiff >= hardDiff) {
+              finalEasy++;
+            } else if (mediumDiff >= hardDiff) {
+              finalMedium++;
+            } else {
+              finalHard++;
+            }
+            remaining--;
+          }
           
-          // Re-adjust if sum != count (should be handled by remainder logic, but just in case)
-          // Actually, hard could be negative if easy+medium > count.
-          // Example: count=1. Easy=1, Med=0, Hard=0. Correct.
-          // Example: count=2. Easy=1, Med=1, Hard=0. Correct.
-          // Example: count=3. Easy=2, Med=1, Hard=0. Correct.
+          // Ensure we have exactly count tasks
+          const total = finalEasy + finalMedium + finalHard;
+          if (total !== count) {
+            // Adjust if there's a discrepancy (shouldn't happen, but safety check)
+            const diff = count - total;
+            if (diff > 0) {
+              finalEasy += diff; // Add remainder to easy
+            } else {
+              finalEasy = Math.max(0, finalEasy + diff); // Subtract from easy if needed
+            }
+          }
           
           for(let i=0; i<finalEasy; i++) finalAllocation.push({ type, difficulty: 'easy' });
           for(let i=0; i<finalMedium; i++) finalAllocation.push({ type, difficulty: 'medium' });
@@ -283,43 +297,95 @@ export default function TaskAllocationScreen({
               </div>
             </>
           ) : (
-            // MANUAL MODE INPUTS (9 Jars)
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-              {/* Materials */}
-              <div style={manualGroupStyle}>
-                <div style={{ fontWeight: 'bold', marginBottom: '10px', display: 'flex', alignItems: 'center' }}>
-                  <span style={{fontSize: '20px', marginRight: '10px'}}>🎯</span> Materials (Slider)
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
-                  <ManualInput label="Easy" value={manualAllocation.g2.easy} onChange={(v) => handleManualChange('g2', 'easy', v)} />
-                  <ManualInput label="Medium" value={manualAllocation.g2.medium} onChange={(v) => handleManualChange('g2', 'medium', v)} />
-                  <ManualInput label="Hard" value={manualAllocation.g2.hard} onChange={(v) => handleManualChange('g2', 'hard', v)} />
-                </div>
-              </div>
-
-              {/* Research */}
-              <div style={manualGroupStyle}>
-                <div style={{ fontWeight: 'bold', marginBottom: '10px', display: 'flex', alignItems: 'center' }}>
-                  <span style={{fontSize: '20px', marginRight: '10px'}}>📚</span> Research (Counting)
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
-                  <ManualInput label="Easy" value={manualAllocation.g1.easy} onChange={(v) => handleManualChange('g1', 'easy', v)} />
-                  <ManualInput label="Medium" value={manualAllocation.g1.medium} onChange={(v) => handleManualChange('g1', 'medium', v)} />
-                  <ManualInput label="Hard" value={manualAllocation.g1.hard} onChange={(v) => handleManualChange('g1', 'hard', v)} />
-                </div>
-              </div>
-
-              {/* Engagement */}
-              <div style={manualGroupStyle}>
-                <div style={{ fontWeight: 'bold', marginBottom: '10px', display: 'flex', alignItems: 'center' }}>
-                  <span style={{fontSize: '20px', marginRight: '10px'}}>✉️</span> Engagement (Typing)
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
-                  <ManualInput label="Easy" value={manualAllocation.g3.easy} onChange={(v) => handleManualChange('g3', 'easy', v)} />
-                  <ManualInput label="Medium" value={manualAllocation.g3.medium} onChange={(v) => handleManualChange('g3', 'medium', v)} />
-                  <ManualInput label="Hard" value={manualAllocation.g3.hard} onChange={(v) => handleManualChange('g3', 'hard', v)} />
-                </div>
-              </div>
+            // MANUAL MODE INPUTS (9 Jars - 3 tasks × 3 difficulties)
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(3, 1fr)', 
+              gap: '15px'
+            }}>
+              {/* Materials - Easy */}
+              <JarInput 
+                icon="🎯" 
+                taskName="Materials" 
+                difficulty="Easy" 
+                value={manualAllocation.g2.easy} 
+                onChange={(v) => handleManualChange('g2', 'easy', v)}
+                color="#4CAF50"
+              />
+              {/* Materials - Medium */}
+              <JarInput 
+                icon="🎯" 
+                taskName="Materials" 
+                difficulty="Medium" 
+                value={manualAllocation.g2.medium} 
+                onChange={(v) => handleManualChange('g2', 'medium', v)}
+                color="#4CAF50"
+              />
+              {/* Materials - Hard */}
+              <JarInput 
+                icon="🎯" 
+                taskName="Materials" 
+                difficulty="Hard" 
+                value={manualAllocation.g2.hard} 
+                onChange={(v) => handleManualChange('g2', 'hard', v)}
+                color="#4CAF50"
+              />
+              
+              {/* Research - Easy */}
+              <JarInput 
+                icon="📚" 
+                taskName="Research" 
+                difficulty="Easy" 
+                value={manualAllocation.g1.easy} 
+                onChange={(v) => handleManualChange('g1', 'easy', v)}
+                color="#9C27B0"
+              />
+              {/* Research - Medium */}
+              <JarInput 
+                icon="📚" 
+                taskName="Research" 
+                difficulty="Medium" 
+                value={manualAllocation.g1.medium} 
+                onChange={(v) => handleManualChange('g1', 'medium', v)}
+                color="#9C27B0"
+              />
+              {/* Research - Hard */}
+              <JarInput 
+                icon="📚" 
+                taskName="Research" 
+                difficulty="Hard" 
+                value={manualAllocation.g1.hard} 
+                onChange={(v) => handleManualChange('g1', 'hard', v)}
+                color="#9C27B0"
+              />
+              
+              {/* Engagement - Easy */}
+              <JarInput 
+                icon="✉️" 
+                taskName="Engagement" 
+                difficulty="Easy" 
+                value={manualAllocation.g3.easy} 
+                onChange={(v) => handleManualChange('g3', 'easy', v)}
+                color="#f44336"
+              />
+              {/* Engagement - Medium */}
+              <JarInput 
+                icon="✉️" 
+                taskName="Engagement" 
+                difficulty="Medium" 
+                value={manualAllocation.g3.medium} 
+                onChange={(v) => handleManualChange('g3', 'medium', v)}
+                color="#f44336"
+              />
+              {/* Engagement - Hard */}
+              <JarInput 
+                icon="✉️" 
+                taskName="Engagement" 
+                difficulty="Hard" 
+                value={manualAllocation.g3.hard} 
+                onChange={(v) => handleManualChange('g3', 'hard', v)}
+                color="#f44336"
+              />
             </div>
           )}
 
@@ -422,21 +488,52 @@ export default function TaskAllocationScreen({
   );
 }
 
-// Helper Component for Manual Input
-const ManualInput = ({ label, value, onChange }) => (
-  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-    <label style={{ fontSize: '12px', marginBottom: '4px', color: '#666' }}>{label}</label>
+// Helper Component for Jar Input (9 jars in manual mode)
+const JarInput = ({ icon, taskName, difficulty, value, onChange, color }) => (
+  <div style={{ 
+    display: 'flex', 
+    flexDirection: 'column', 
+    alignItems: 'center',
+    background: '#f9f9f9',
+    padding: '20px',
+    borderRadius: '12px',
+    border: `2px solid ${color}40`,
+    transition: 'all 0.2s'
+  }}>
+    <div style={{ fontSize: '24px', marginBottom: '8px' }}>{icon}</div>
+    <div style={{ 
+      fontSize: '14px', 
+      fontWeight: 'bold', 
+      color: color,
+      marginBottom: '4px',
+      textAlign: 'center'
+    }}>
+      {taskName}
+    </div>
+    <div style={{ 
+      fontSize: '12px', 
+      color: '#666',
+      marginBottom: '12px',
+      textAlign: 'center'
+    }}>
+      {difficulty}
+    </div>
     <input 
       type="number" 
       min="0" 
+      max={100}
       value={value}
       onChange={(e) => onChange(e.target.value)}
       style={{
-        width: '50px',
-        padding: '8px',
+        width: '70px',
+        padding: '12px',
         textAlign: 'center',
-        border: '1px solid #ddd',
-        borderRadius: '4px'
+        border: `2px solid ${color}`,
+        borderRadius: '8px',
+        fontSize: '18px',
+        fontWeight: 'bold',
+        color: color,
+        background: 'white'
       }}
     />
   </div>

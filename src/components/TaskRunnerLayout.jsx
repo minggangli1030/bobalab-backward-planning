@@ -11,6 +11,7 @@ export default function TaskRunnerLayout({
   points,
   timeRemaining,
   onTimeUp,
+  penalties = { switch: 0, refill: 0, unfinished: 0 },
   chatInterface
 }) {
   const currentTaskType = taskQueue[currentTaskIndex];
@@ -186,6 +187,28 @@ export default function TaskRunnerLayout({
           <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#2196F3' }}>
             {points}
           </div>
+          {/* Penalties Display */}
+          {(penalties.switch > 0 || penalties.refill > 0 || penalties.unfinished > 0) && (
+            <div style={{ 
+              marginTop: '8px', 
+              fontSize: '11px', 
+              color: '#f44336',
+              display: 'flex',
+              gap: '8px',
+              justifyContent: 'center',
+              flexWrap: 'wrap'
+            }}>
+              {penalties.switch > 0 && (
+                <span title="Switch penalties">🔄 -{penalties.switch}</span>
+              )}
+              {penalties.refill > 0 && (
+                <span title="Refill penalties">🔄 -{penalties.refill}</span>
+              )}
+              {penalties.unfinished > 0 && (
+                <span title="Unfinished task penalties">⚠️ -{penalties.unfinished}</span>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Right: Detailed Task Progress */}

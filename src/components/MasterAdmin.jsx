@@ -31,7 +31,25 @@ export default function MasterAdmin({ onClose }) {
     unfinishedJarPenalty: 0,
     aiDelay: 0,
     taskOrderStrategy: "sequential_task",
-    difficultyMode: "fixed"
+    difficultyMode: "fixed",
+    // Scoring configuration: 3 tasks × 3 difficulties × 2 scores = 18 variables
+    scoring: {
+      g1: { // Research (Counting)
+        easy: { fullCorrect: 2, halfCorrect: 1 },
+        medium: { fullCorrect: 2, halfCorrect: 1 },
+        hard: { fullCorrect: 2, halfCorrect: 1 }
+      },
+      g2: { // Materials (Slider)
+        easy: { fullCorrect: 2, halfCorrect: 1 },
+        medium: { fullCorrect: 2, halfCorrect: 1 },
+        hard: { fullCorrect: 2, halfCorrect: 1 }
+      },
+      g3: { // Engagement (Typing)
+        easy: { fullCorrect: 2, halfCorrect: 1 },
+        medium: { fullCorrect: 2, halfCorrect: 1 },
+        hard: { fullCorrect: 2, halfCorrect: 1 }
+      }
+    }
   });
   const [savingConfig, setSavingConfig] = useState(false);
 
@@ -70,6 +88,8 @@ export default function MasterAdmin({ onClose }) {
     setGameConfig(prev => ({ ...prev, [key]: value }));
   };
 
+  const [allSessions, setAllSessions] = useState([]);
+
   const fetchStudents = async () => {
     setLoading(true);
     try {
@@ -86,6 +106,13 @@ export default function MasterAdmin({ onClose }) {
       const sessionsRef = collection(db, "sessions");
       // Optional: Query only relevant fields if possible, but for now fetch all to be safe
       const sessionsSnap = await getDocs(sessionsRef);
+      
+      // Store all sessions for download
+      const sessionsData = sessionsSnap.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setAllSessions(sessionsData);
       
       console.log(`Debug: Found ${studentSnap.size} students and ${sessionsSnap.size} sessions`);
 
@@ -202,6 +229,86 @@ export default function MasterAdmin({ onClose }) {
     } finally {
       setRefreshing(false);
     }
+  };
+
+  const downloadData = () => {
+    // Convert students data to CSV
+    const headers = ['Student ID', 'Section', 'Has Played', 'Last Played', 'Total Accesses', 'Highest Score'];
+    const rows = students
+      .filter(s => !s.section?.includes("ADMIN"))
+      .map(student => {
+        const highestScore = student.scores && student.scores.length > 0 
+          ? Math.max(...student.scores.map(s => s.total || 0)) 
+          : 0;
+        return [
+          student.sid || student.id || '',
+          student.section || 'N/A',
+          student.hasPlayed ? 'Yes' : 'No',
+          student.lastPlayed ? new Date(student.lastPlayed).toLocaleString() : '-',
+          student.totalAccesses || 0,
+          highestScore
+        ];
+      });
+
+    // Create CSV content
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+    ].join('\n');
+
+    // Create download link
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `student_data_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const downloadSessionsData = () => {
+    // Convert sessions data to CSV
+    const headers = ['Session ID', 'Student ID', 'Section', 'Start Time', 'Status', 'Final Score', 'Student Learning Score', 'Completed Tasks', 'Random Seed'];
+    const rows = allSessions.map(session => {
+      const startTime = session.startTime?.toDate 
+        ? session.startTime.toDate().toLocaleString() 
+        : session.clientStartTime 
+        ? new Date(session.clientStartTime).toLocaleString() 
+        : '-';
+      
+      const completedTasks = session.completedTasks ? Object.keys(session.completedTasks).length : 0;
+      
+      return [
+        session.id || '',
+        session.studentId || '',
+        session.section || 'N/A',
+        startTime,
+        session.status || 'unknown',
+        session.finalScore !== undefined ? session.finalScore : '',
+        session.studentLearningScore !== undefined ? session.studentLearningScore : '',
+        completedTasks,
+        session.randomSeed || ''
+      ];
+    });
+
+    // Create CSV content
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+    ].join('\n');
+
+    // Create download link
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `sessions_data_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const tabButtonStyle = (isActive) => ({
@@ -321,6 +428,21 @@ export default function MasterAdmin({ onClose }) {
                   <option value="sequential_difficulty">Order by Difficulty (Easy → Medium → Hard)</option>
                 </select>
               </div>
+
+              <div style={{ marginTop: "15px" }}>
+                <label style={{ display: "block", marginBottom: "5px", fontSize: "13px", fontWeight: "600" }}>Game Mode</label>
+                <select 
+                  value={gameConfig.gameMode || "knapsack"} 
+                  onChange={(e) => handleConfigChange("gameMode", e.target.value)}
+                  style={{ width: "100%", padding: "8px", borderRadius: "4px", border: "1px solid #ddd", fontSize: "14px" }}
+                >
+                  <option value="knapsack">Knapsack Mode (Allocate tasks upfront, limited tasks)</option>
+                  <option value="sequential">Sequential Mode (Infinite levels, countdown timer)</option>
+                </select>
+                <p style={{ fontSize: "11px", color: "#666", marginTop: "5px" }}>
+                  Sequential mode: Timer counts down, infinite levels, can keep playing until time runs out.
+                </p>
+              </div>
             </div>
 
             {/* Penalties & Mechanics */}
@@ -371,8 +493,100 @@ export default function MasterAdmin({ onClose }) {
             </div>
           </div>
 
+          {/* Scoring Configuration */}
+          <div style={{ background: "white", padding: "20px", borderRadius: "8px", boxShadow: "0 2px 4px rgba(0,0,0,0.1)", marginTop: "20px" }}>
+            <h3 style={{ margin: "0 0 15px 0", fontSize: "16px", color: "#555" }}>🎯 Scoring Configuration</h3>
+            <p style={{ fontSize: "12px", color: "#666", marginBottom: "20px" }}>
+              Configure points for each task type and difficulty level. "Full Correct" = perfect answer, "Half Correct" = partial credit.
+            </p>
+            
+            {['g1', 'g2', 'g3'].map(taskType => {
+              const taskNames = { g1: 'Research (Counting)', g2: 'Materials (Slider)', g3: 'Engagement (Typing)' };
+              const taskIcons = { g1: '📚', g2: '🎯', g3: '✉️' };
+              const taskColors = { g1: '#9C27B0', g2: '#4CAF50', g3: '#f44336' };
+              
+              return (
+                <div key={taskType} style={{ marginBottom: "25px", padding: "15px", background: "#f9f9f9", borderRadius: "8px" }}>
+                  <div style={{ fontWeight: "bold", marginBottom: "12px", color: taskColors[taskType], display: "flex", alignItems: "center", gap: "8px" }}>
+                    <span>{taskIcons[taskType]}</span>
+                    <span>{taskNames[taskType]}</span>
+                  </div>
+                  
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "15px" }}>
+                    {['easy', 'medium', 'hard'].map(difficulty => {
+                      const diffLabels = { easy: 'Easy', medium: 'Medium', hard: 'Hard' };
+                      return (
+                        <div key={difficulty} style={{ background: "white", padding: "12px", borderRadius: "6px", border: "1px solid #ddd" }}>
+                          <div style={{ fontSize: "12px", fontWeight: "600", marginBottom: "8px", color: "#666" }}>
+                            {diffLabels[difficulty]}
+                          </div>
+                          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                            <div>
+                              <label style={{ display: "block", fontSize: "11px", marginBottom: "4px", color: "#666" }}>
+                                Full Correct
+                              </label>
+                              <input
+                                type="number"
+                                min="0"
+                                value={gameConfig.scoring?.[taskType]?.[difficulty]?.fullCorrect ?? 2}
+                                onChange={(e) => {
+                                  const value = parseInt(e.target.value) || 0;
+                                  setGameConfig(prev => ({
+                                    ...prev,
+                                    scoring: {
+                                      ...prev.scoring,
+                                      [taskType]: {
+                                        ...prev.scoring?.[taskType],
+                                        [difficulty]: {
+                                          ...prev.scoring?.[taskType]?.[difficulty],
+                                          fullCorrect: value
+                                        }
+                                      }
+                                    }
+                                  }));
+                                }}
+                                style={{ width: "100%", padding: "6px", borderRadius: "4px", border: "1px solid #ddd", fontSize: "13px" }}
+                              />
+                            </div>
+                            <div>
+                              <label style={{ display: "block", fontSize: "11px", marginBottom: "4px", color: "#666" }}>
+                                Half Correct
+                              </label>
+                              <input
+                                type="number"
+                                min="0"
+                                value={gameConfig.scoring?.[taskType]?.[difficulty]?.halfCorrect ?? 1}
+                                onChange={(e) => {
+                                  const value = parseInt(e.target.value) || 0;
+                                  setGameConfig(prev => ({
+                                    ...prev,
+                                    scoring: {
+                                      ...prev.scoring,
+                                      [taskType]: {
+                                        ...prev.scoring?.[taskType],
+                                        [difficulty]: {
+                                          ...prev.scoring?.[taskType]?.[difficulty],
+                                          halfCorrect: value
+                                        }
+                                      }
+                                    }
+                                  }));
+                                }}
+                                style={{ width: "100%", padding: "6px", borderRadius: "4px", border: "1px solid #ddd", fontSize: "13px" }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
           {/* Save Button */}
-          <div style={{ textAlign: "right" }}>
+          <div style={{ textAlign: "right", marginTop: "20px" }}>
             <button
               onClick={saveGameConfig}
               disabled={savingConfig}
@@ -399,22 +613,52 @@ export default function MasterAdmin({ onClose }) {
         <div style={{ background: "white", padding: "25px", borderRadius: "8px", boxShadow: "0 2px 4px rgba(0,0,0,0.1)" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
             <h2 style={{ margin: 0, fontSize: "18px" }}>Active Sessions</h2>
-            <button
-              onClick={resetAllData}
-              disabled={refreshing}
-              style={{
-                padding: "10px 20px",
-                background: "#f44336",
-                color: "white",
-                border: "none",
-                borderRadius: "6px",
-                cursor: refreshing ? "not-allowed" : "pointer",
-                fontWeight: "500",
-                opacity: refreshing ? 0.6 : 1
-              }}
-            >
-              {refreshing ? "Processing..." : "🗑️ Reset All Data"}
-            </button>
+            <div style={{ display: "flex", gap: "10px" }}>
+              <button
+                onClick={downloadData}
+                style={{
+                  padding: "10px 20px",
+                  background: "#2196F3",
+                  color: "white",
+                  border: "none",
+                  borderRadius: "6px",
+                  cursor: "pointer",
+                  fontWeight: "500"
+                }}
+              >
+                📥 Download Student Data
+              </button>
+              <button
+                onClick={downloadSessionsData}
+                style={{
+                  padding: "10px 20px",
+                  background: "#4CAF50",
+                  color: "white",
+                  border: "none",
+                  borderRadius: "6px",
+                  cursor: "pointer",
+                  fontWeight: "500"
+                }}
+              >
+                📥 Download Sessions Data
+              </button>
+              <button
+                onClick={resetAllData}
+                disabled={refreshing}
+                style={{
+                  padding: "10px 20px",
+                  background: "#f44336",
+                  color: "white",
+                  border: "none",
+                  borderRadius: "6px",
+                  cursor: refreshing ? "not-allowed" : "pointer",
+                  fontWeight: "500",
+                  opacity: refreshing ? 0.6 : 1
+                }}
+              >
+                {refreshing ? "Processing..." : "🗑️ Reset All Data"}
+              </button>
+            </div>
           </div>
 
           <div style={{ marginBottom: "20px", padding: "15px", background: "#f5f5f5", borderRadius: "6px" }}>

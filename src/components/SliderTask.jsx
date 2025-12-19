@@ -11,6 +11,7 @@ export default function SliderTask({
   onComplete,
   isPractice = false,
   currentTaskId,
+  preGeneratedPattern = null,
 }) {
   const [target, setTarget] = useState(5);
   const [input, setInput] = useState(0);
@@ -32,8 +33,8 @@ export default function SliderTask({
       setStep(1); // Changed from 0.01 to 1 for integer sliding
       setShowValue(true);
     } else {
-      // For regular mode, use pattern generator
-      const pattern = patternGenerator.generateSliderPattern(taskNum);
+      // Use pre-generated pattern if available, otherwise generate on the fly
+      const pattern = preGeneratedPattern || patternGenerator.generateSliderPattern(taskNum);
       setTarget(pattern.target);
       setStep(pattern.step);
       setShowValue(pattern.showValue);
@@ -41,7 +42,7 @@ export default function SliderTask({
     setInput(0);
     setFeedback(null);
     attemptsRef.current = 0;
-  }, [taskNum, isPractice]);
+  }, [taskNum, isPractice, preGeneratedPattern]);
 
   useEffect(() => {
     const handleAIHelp = (event) => {

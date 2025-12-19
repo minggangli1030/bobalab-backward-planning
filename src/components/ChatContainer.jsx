@@ -1011,29 +1011,6 @@ Typing: "${help.text.substring(
 
             {/* Individual Task Buttons */}
             <button
-              onClick={() => handleSmartHelp("research")}
-              disabled={!currentTask.startsWith("g1") || currentTaskUsed}
-              style={{
-                padding: "10px",
-                background: currentTask.startsWith("g1") && !currentTaskUsed
-                  ? "#9C27B0"
-                  : currentTaskUsed && currentTask.startsWith("g1")
-                  ? "#ff9800"
-                  : "#e0e0e0",
-                color: currentTask.startsWith("g1") || currentTaskUsed ? "white" : "#999",
-                border: "none",
-                borderRadius: "6px",
-                cursor: currentTask.startsWith("g1") && !currentTaskUsed
-                  ? "pointer"
-                  : "not-allowed",
-                fontWeight: "bold",
-                fontSize: "12px",
-              }}
-            >
-              📚 Research
-            </button>
-
-            <button
               onClick={() => handleSmartHelp("materials")}
               disabled={!currentTask.startsWith("g2") || currentTaskUsed}
               style={{
@@ -1054,6 +1031,29 @@ Typing: "${help.text.substring(
               }}
             >
               🎯 Materials
+            </button>
+
+            <button
+              onClick={() => handleSmartHelp("research")}
+              disabled={!currentTask.startsWith("g1") || currentTaskUsed}
+              style={{
+                padding: "10px",
+                background: currentTask.startsWith("g1") && !currentTaskUsed
+                  ? "#9C27B0"
+                  : currentTaskUsed && currentTask.startsWith("g1")
+                  ? "#ff9800"
+                  : "#e0e0e0",
+                color: currentTask.startsWith("g1") || currentTaskUsed ? "white" : "#999",
+                border: "none",
+                borderRadius: "6px",
+                cursor: currentTask.startsWith("g1") && !currentTaskUsed
+                  ? "pointer"
+                  : "not-allowed",
+                fontWeight: "bold",
+                fontSize: "12px",
+              }}
+            >
+              📚 Research
             </button>
 
             <button
