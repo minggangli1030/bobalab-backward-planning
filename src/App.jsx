@@ -921,9 +921,13 @@ function App() {
     setSwitches((prev) => prev + 1);
 
     // Update Current Tab to the first item of the new block (which is the first of targetTypeItems)
+    // Update UI immediately for better responsiveness
     if (targetTypeItems.length > 0) {
       const newTab = targetTypeItems[0];
-      handleTabSwitch(newTab);
+      // handleTabSwitch now updates state immediately, so just call it
+      handleTabSwitch(newTab).catch((err) =>
+        console.error("Error tracking switch:", err)
+      );
     }
   };
 
@@ -1242,14 +1246,13 @@ function App() {
       return;
     }
 
-    if (!isAutoAdvance) {
-      await eventTracker.logEvent("manual_tab_switch", {
-        from: currentTab,
-        to: newTab,
-        reason: "user_clicked",
-      });
-    }
+    // Update UI state immediately for responsiveness (before async operations)
+    const oldTab = currentTab;
+    setCurrentTab(newTab);
+    setTaskStartTimes((prev) => ({ ...prev, [newTab]: Date.now() }));
+    eventTracker.setPageStartTime(newTab);
 
+    // Update activity tracking immediately
     lastActivityRef.current = Date.now();
     if (isIdle) {
       setIsIdle(false);
@@ -1260,25 +1263,36 @@ function App() {
       }
     }
 
-    if (currentTab !== newTab && !isAutoAdvance) {
+    if (oldTab !== newTab && !isAutoAdvance) {
       setSwitches((prev) => prev + 1);
     }
 
-    await eventTracker.trackPageSwitch(currentTab, newTab, isAutoAdvance);
-
-    if (taskStartTimes[currentTab]) {
-      const timeSpent = Date.now() - taskStartTimes[currentTab];
-      await eventTracker.logEvent("task_time", {
-        taskId: currentTab,
-        timeSpent,
-        completed: completed[currentTab] || false,
-        leftForTask: newTab,
-      });
+    // Do async event tracking in background (non-blocking)
+    if (!isAutoAdvance) {
+      eventTracker
+        .logEvent("manual_tab_switch", {
+          from: oldTab,
+          to: newTab,
+          reason: "user_clicked",
+        })
+        .catch((err) => console.error("Error logging tab switch:", err));
     }
 
-    setCurrentTab(newTab);
-    setTaskStartTimes((prev) => ({ ...prev, [newTab]: Date.now() }));
-    eventTracker.setPageStartTime(newTab);
+    eventTracker
+      .trackPageSwitch(oldTab, newTab, isAutoAdvance)
+      .catch((err) => console.error("Error tracking page switch:", err));
+
+    if (taskStartTimes[oldTab]) {
+      const timeSpent = Date.now() - taskStartTimes[oldTab];
+      eventTracker
+        .logEvent("task_time", {
+          taskId: oldTab,
+          timeSpent,
+          completed: completed[oldTab] || false,
+          leftForTask: newTab,
+        })
+        .catch((err) => console.error("Error logging task time:", err));
+    }
   };
 
   // Show notification
@@ -1778,30 +1792,122 @@ function App() {
 
     const config = JSON.parse(sessionStorage.getItem("gameConfig") || "{}");
     const isAdmin = config.role === "admin";
+    const currentGameMode = globalConfig.gameMode || "knapsack";
+    const timeMinutes = globalConfig.semesterDuration || 12;
+    const totalTasks = globalConfig.totalTasks || 10;
 
     return (
       <div className="app">
-        <div className="landing-container">
+        <div
+          style={{
+            maxWidth: "1000px",
+            margin: "40px auto",
+            padding: "0 20px",
+          }}
+        >
           <div
-            className="landing-card"
-            style={{ padding: "40px", maxWidth: "900px" }}
+            style={{
+              background: "white",
+              borderRadius: "12px",
+              boxShadow: "0 4px 20px rgba(0,0,0,0.1)",
+              padding: "40px",
+            }}
           >
             <h1
               style={{
                 color: "#333",
-                marginBottom: "30px",
+                marginBottom: "10px",
                 fontSize: "32px",
-                textAlign: "left",
+                textAlign: "center",
+                fontWeight: "600",
               }}
             >
               Can you beat Park? - Semester {currentSemester}/{totalSemesters}
             </h1>
 
+            {/* Game Info Section - Prominent */}
+            <div
+              style={{
+                background: "linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 100%)",
+                borderRadius: "12px",
+                padding: "25px",
+                marginBottom: "35px",
+                border: "2px solid #2196F3",
+                boxShadow: "0 2px 8px rgba(33, 150, 243, 0.2)",
+              }}
+            >
+              <h2
+                style={{
+                  color: "#1976d2",
+                  fontSize: "24px",
+                  marginBottom: "15px",
+                  textAlign: "center",
+                  fontWeight: "600",
+                }}
+              >
+                ⏱️ Game Overview
+              </h2>
+              <p
+                style={{
+                  fontSize: "18px",
+                  color: "#333",
+                  textAlign: "center",
+                  marginBottom: "12px",
+                  fontWeight: "500",
+                }}
+              >
+                You have{" "}
+                <strong style={{ color: "#1976d2" }}>
+                  {timeMinutes} minutes
+                </strong>{" "}
+                to do{" "}
+                <strong style={{ color: "#1976d2" }}>{totalTasks} tasks</strong>
+                , in what order?
+              </p>
+              {currentGameMode === "sequential" ? (
+                <p
+                  style={{
+                    fontSize: "16px",
+                    color: "#555",
+                    textAlign: "center",
+                    fontStyle: "italic",
+                    background: "white",
+                    padding: "12px",
+                    borderRadius: "8px",
+                    marginTop: "10px",
+                  }}
+                >
+                  🎯 <strong>Sequential Mode:</strong> Do as much as you can -
+                  the timer counts down but levels are infinite!
+                </p>
+              ) : (
+                <p
+                  style={{
+                    fontSize: "16px",
+                    color: "#555",
+                    textAlign: "center",
+                    fontStyle: "italic",
+                    background: "white",
+                    padding: "12px",
+                    borderRadius: "8px",
+                    marginTop: "10px",
+                  }}
+                >
+                  🎯 <strong>Knapsack Mode:</strong> You can choose how many of
+                  each task to do!
+                </p>
+              )}
+            </div>
+
             <div className="game-info" style={{ textAlign: "left" }}>
               <div
                 style={{
-                  marginBottom: "35px",
-                  textAlign: "left",
+                  background: "#ffebee",
+                  borderRadius: "10px",
+                  padding: "20px",
+                  marginBottom: "20px",
+                  border: "2px solid #f44336",
+                  boxShadow: "0 2px 6px rgba(244, 67, 54, 0.1)",
                 }}
               >
                 <h3
@@ -1812,16 +1918,17 @@ function App() {
                     display: "flex",
                     alignItems: "center",
                     gap: "10px",
+                    fontWeight: "600",
                   }}
                 >
                   <span style={{ fontSize: "24px" }}>✉️</span> Engagement
                 </h3>
                 <p
                   style={{
-                    marginLeft: "34px",
                     fontSize: "16px",
                     lineHeight: "1.6",
                     color: "#555",
+                    margin: 0,
                   }}
                 >
                   Build interest that compounds! Each point adds 0.15% interest
@@ -1831,8 +1938,12 @@ function App() {
 
               <div
                 style={{
-                  marginBottom: "35px",
-                  textAlign: "left",
+                  background: "#f3e5f5",
+                  borderRadius: "10px",
+                  padding: "20px",
+                  marginBottom: "20px",
+                  border: "2px solid #9C27B0",
+                  boxShadow: "0 2px 6px rgba(156, 39, 176, 0.1)",
                 }}
               >
                 <h3
@@ -1843,16 +1954,17 @@ function App() {
                     display: "flex",
                     alignItems: "center",
                     gap: "10px",
+                    fontWeight: "600",
                   }}
                 >
                   <span style={{ fontSize: "24px" }}>📚</span> Research
                 </h3>
                 <p
                   style={{
-                    marginLeft: "34px",
                     fontSize: "16px",
                     lineHeight: "1.6",
                     color: "#555",
+                    margin: 0,
                   }}
                 >
                   Research amplifies your FUTURE materials! Each point adds +15%
@@ -1863,8 +1975,12 @@ function App() {
 
               <div
                 style={{
-                  marginBottom: "35px",
-                  textAlign: "left",
+                  background: "#e8f5e9",
+                  borderRadius: "10px",
+                  padding: "20px",
+                  marginBottom: "20px",
+                  border: "2px solid #4CAF50",
+                  boxShadow: "0 2px 6px rgba(76, 175, 80, 0.1)",
                 }}
               >
                 <h3
@@ -1875,16 +1991,17 @@ function App() {
                     display: "flex",
                     alignItems: "center",
                     gap: "10px",
+                    fontWeight: "600",
                   }}
                 >
                   <span style={{ fontSize: "24px" }}>🎯</span> Materials
                 </h3>
                 <p
                   style={{
-                    marginLeft: "34px",
                     fontSize: "16px",
                     lineHeight: "1.6",
                     color: "#555",
+                    margin: 0,
                   }}
                 >
                   Create teaching materials - each point directly contributes to
@@ -1894,49 +2011,54 @@ function App() {
 
               <div
                 style={{
-                  background: "#f0f8ff",
-                  borderRadius: "8px",
+                  background:
+                    "linear-gradient(135deg, #e3f2fd 0%, #f0f8ff 100%)",
+                  borderRadius: "12px",
                   padding: "25px",
                   marginBottom: "30px",
                   border: "2px solid #2196F3",
+                  boxShadow: "0 2px 8px rgba(33, 150, 243, 0.15)",
                 }}
               >
                 <h3
                   style={{
-                    color: "#2196F3",
-                    fontSize: "20px",
+                    color: "#1976d2",
+                    fontSize: "22px",
                     marginBottom: "20px",
                     display: "flex",
                     alignItems: "center",
                     gap: "10px",
+                    fontWeight: "600",
                   }}
                 >
-                  <span style={{ fontSize: "24px" }}>📊</span> Student Learning
+                  <span style={{ fontSize: "28px" }}>📊</span> Student Learning
                   Formula
                 </h3>
                 <div
                   style={{
                     background: "white",
-                    padding: "18px",
-                    borderRadius: "6px",
+                    padding: "20px",
+                    borderRadius: "10px",
                     fontFamily: "monospace",
                     fontSize: "18px",
                     textAlign: "center",
                     marginBottom: "20px",
-                    border: "1px solid #e0e0e0",
+                    border: "2px solid #2196F3",
                     lineHeight: "1.8",
+                    boxShadow: "0 2px 4px rgba(0,0,0,0.05)",
                   }}
                 >
                   Goal ={" "}
-                  <strong>
+                  <strong style={{ color: "#1976d2" }}>
                     Materials × (1 + Research×0.15) + Engagement Interest
                   </strong>
                   <br />
                   <div
                     style={{
                       fontSize: "14px",
-                      marginTop: "10px",
+                      marginTop: "12px",
                       fontFamily: "sans-serif",
+                      color: "#666",
                     }}
                   >
                     Research multipliers apply only to materials earned{" "}
@@ -2132,12 +2254,34 @@ function App() {
               </div>
             )}
 
-            <button
-              className="start-button"
-              onClick={() => setMode("practiceChoice")}
-            >
-              Start Semester {currentSemester}
-            </button>
+            <div style={{ textAlign: "center", marginTop: "30px" }}>
+              <button
+                onClick={() => setMode("practiceChoice")}
+                style={{
+                  padding: "15px 40px",
+                  background: "#4CAF50",
+                  color: "white",
+                  border: "none",
+                  borderRadius: "8px",
+                  fontSize: "18px",
+                  fontWeight: "bold",
+                  cursor: "pointer",
+                  boxShadow: "0 4px 6px rgba(0,0,0,0.1)",
+                  transition: "all 0.3s",
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.transform = "translateY(-2px)";
+                  e.currentTarget.style.boxShadow =
+                    "0 6px 12px rgba(0,0,0,0.15)";
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.transform = "translateY(0)";
+                  e.currentTarget.style.boxShadow = "0 4px 6px rgba(0,0,0,0.1)";
+                }}
+              >
+                Start Semester {currentSemester}
+              </button>
+            </div>
 
             {isAdminMode && (
               <div

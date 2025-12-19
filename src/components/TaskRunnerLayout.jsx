@@ -104,14 +104,15 @@ export default function TaskRunnerLayout({
         flexDirection: 'column', 
         alignItems: 'center',
         background: bgColor,
-        borderRadius: '12px',
-        padding: '10px',
+        borderRadius: '10px',
+        padding: difficultyMode === 'manual' ? '8px' : '10px',
         border: `2px solid ${isActiveType ? color : 'transparent'}`,
-        height: '100%',
+        height: difficultyMode === 'manual' ? 'auto' : '100%',
+        minHeight: difficultyMode === 'manual' ? '120px' : 'auto',
         position: 'relative'
       }}>
         {/* Header */}
-        <div style={{ fontSize: '14px', fontWeight: 'bold', color: color, marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+        <div style={{ fontSize: difficultyMode === 'manual' ? '12px' : '14px', fontWeight: 'bold', color: color, marginBottom: difficultyMode === 'manual' ? '6px' : '10px', display: 'flex', alignItems: 'center', gap: '5px', justifyContent: 'center' }}>
           <span>{icon}</span>
           <span>{count}</span>
         </div>
@@ -174,8 +175,8 @@ export default function TaskRunnerLayout({
           )}
         </div>
         
-        <div style={{ fontSize: '12px', color: '#666', marginTop: '5px', textAlign: 'center' }}>
-          {label}
+        <div style={{ fontSize: difficultyMode === 'manual' ? '11px' : '12px', color: '#666', marginTop: difficultyMode === 'manual' ? '4px' : '5px', textAlign: 'center' }}>
+          {difficultyMode === 'manual' ? label : label}
           {difficulty && <div style={{ fontSize: '10px', color: '#999' }}>{difficulty}</div>}
         </div>
       </div>
@@ -292,22 +293,54 @@ export default function TaskRunnerLayout({
           <h3 style={{ margin: '0 0 15px 0', fontSize: '16px', color: '#666', textAlign: 'center' }}>Task Jars</h3>
           
           {difficultyMode === 'manual' ? (
-            // 9 jars: 3 tasks × 3 difficulties
+            // 9 jars: 3 tasks × 3 difficulties - organized by task type with better spacing
             <div style={{ 
-              display: 'grid', 
-              gridTemplateColumns: 'repeat(3, 1fr)', 
-              gap: '8px',
+              display: 'flex', 
+              flexDirection: 'column',
+              gap: '12px',
               flex: 1
             }}>
-              {renderJar('g2-easy', 'Materials', '🎯', '#4CAF50', '#e8f5e9', jars['g2-easy'], 'Easy')}
-              {renderJar('g2-medium', 'Materials', '🎯', '#4CAF50', '#e8f5e9', jars['g2-medium'], 'Medium')}
-              {renderJar('g2-hard', 'Materials', '🎯', '#4CAF50', '#e8f5e9', jars['g2-hard'], 'Hard')}
-              {renderJar('g1-easy', 'Research', '📚', '#9C27B0', '#f3e5f5', jars['g1-easy'], 'Easy')}
-              {renderJar('g1-medium', 'Research', '📚', '#9C27B0', '#f3e5f5', jars['g1-medium'], 'Medium')}
-              {renderJar('g1-hard', 'Research', '📚', '#9C27B0', '#f3e5f5', jars['g1-hard'], 'Hard')}
-              {renderJar('g3-easy', 'Engagement', '✉️', '#f44336', '#ffebee', jars['g3-easy'], 'Easy')}
-              {renderJar('g3-medium', 'Engagement', '✉️', '#f44336', '#ffebee', jars['g3-medium'], 'Medium')}
-              {renderJar('g3-hard', 'Engagement', '✉️', '#f44336', '#ffebee', jars['g3-hard'], 'Hard')}
+              {/* Materials Group */}
+              <div style={{ 
+                display: 'flex', 
+                flexDirection: 'column',
+                gap: '6px'
+              }}>
+                <div style={{ fontSize: '12px', fontWeight: '600', color: '#4CAF50', marginBottom: '4px' }}>Materials</div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
+                  {renderJar('g2-easy', 'Easy', '🎯', '#4CAF50', '#e8f5e9', jars['g2-easy'], null)}
+                  {renderJar('g2-medium', 'Medium', '🎯', '#4CAF50', '#e8f5e9', jars['g2-medium'], null)}
+                  {renderJar('g2-hard', 'Hard', '🎯', '#4CAF50', '#e8f5e9', jars['g2-hard'], null)}
+                </div>
+              </div>
+              
+              {/* Research Group */}
+              <div style={{ 
+                display: 'flex', 
+                flexDirection: 'column',
+                gap: '6px'
+              }}>
+                <div style={{ fontSize: '12px', fontWeight: '600', color: '#9C27B0', marginBottom: '4px' }}>Research</div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
+                  {renderJar('g1-easy', 'Easy', '📚', '#9C27B0', '#f3e5f5', jars['g1-easy'], null)}
+                  {renderJar('g1-medium', 'Medium', '📚', '#9C27B0', '#f3e5f5', jars['g1-medium'], null)}
+                  {renderJar('g1-hard', 'Hard', '📚', '#9C27B0', '#f3e5f5', jars['g1-hard'], null)}
+                </div>
+              </div>
+              
+              {/* Engagement Group */}
+              <div style={{ 
+                display: 'flex', 
+                flexDirection: 'column',
+                gap: '6px'
+              }}>
+                <div style={{ fontSize: '12px', fontWeight: '600', color: '#f44336', marginBottom: '4px' }}>Engagement</div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
+                  {renderJar('g3-easy', 'Easy', '✉️', '#f44336', '#ffebee', jars['g3-easy'], null)}
+                  {renderJar('g3-medium', 'Medium', '✉️', '#f44336', '#ffebee', jars['g3-medium'], null)}
+                  {renderJar('g3-hard', 'Hard', '✉️', '#f44336', '#ffebee', jars['g3-hard'], null)}
+                </div>
+              </div>
             </div>
           ) : (
             // 3 jars: by type only (fixed mode)
