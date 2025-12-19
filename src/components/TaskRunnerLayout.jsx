@@ -49,7 +49,8 @@ export default function TaskRunnerLayout({
   //    - But the user wants to see "Jars filled with tasks".
   //    - So let's show the queue separated by type.
   
-  const upcomingQueue = taskQueue.slice(currentTaskIndex); // Includes current
+  // If all tasks are completed, show empty jars (all 0)
+  const upcomingQueue = allTasksCompleted ? [] : taskQueue.slice(currentTaskIndex); // Includes current
   
   // Determine difficulty from task ID: 1-5 = easy, 6-10 = medium, 11+ = hard
   const getDifficulty = (taskId) => {
@@ -265,7 +266,7 @@ export default function TaskRunnerLayout({
                 <div style={{ fontWeight: '600', marginBottom: '4px', color: '#333', fontSize: '10px' }}>Rules:</div>
                 <div style={{ fontSize: '9px', lineHeight: '1.5' }}>
                   Switch: -{globalConfig?.switchCost || 0} pts<br/>
-                  Refill: -{globalConfig?.unfinishedJarPenalty || 0} pts<br/>
+                  Refill: {globalConfig?.jarRefillFreezeTime || 0}s pause<br/>
                   Unfinished: -{globalConfig?.unfinishedTaskPenalty || 0} pts
                 </div>
               </div>
