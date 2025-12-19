@@ -116,17 +116,18 @@ export default function TypingTask({
     const timeTaken = Date.now() - startTime;
     const currentTaskId = `g3t${taskNum}`;
 
-    // Check for AI help response tracking
+    // Check for AI help response tracking and get AI help data
     const lastAIHelp = localStorage.getItem(`lastAIHelp_${currentTaskId}`);
-    if (lastAIHelp) {
-      const helpData = JSON.parse(lastAIHelp);
-      const timeBetween = Date.now() - helpData.timestamp;
-      const playerAction = input === helpData.suggestion ? "accepted" : "modified";
+    const aiHelpData = lastAIHelp ? JSON.parse(lastAIHelp) : null;
+    
+    if (lastAIHelp && aiHelpData) {
+      const timeBetween = Date.now() - aiHelpData.timestamp;
+      const playerAction = input === aiHelpData.suggestion ? "accepted" : "modified";
       
       await eventTracker.trackAIHelpResponse(
         currentTaskId,
-        helpData.type,
-        helpData.suggestion,
+        aiHelpData.type,
+        aiHelpData.suggestion,
         playerAction,
         input,
         timeBetween
@@ -179,11 +180,14 @@ export default function TypingTask({
 
     await eventTracker.trackTaskAttempt(
       currentTaskId,
-      attemptsRef.current,
-      true, // Always passes
-      timeTaken,
-      input,
-      pattern
+      {
+        attempts: attemptsRef.current,
+        passed: true,
+        timeTaken,
+        playerSubmission: input, // What player submitted
+        goal: pattern, // Ground truth
+        aiSubmission: aiHelpData?.suggestion || null, // What AI suggested (if used)
+      }
     );
 
     const sessionId = localStorage.getItem("sessionId");
@@ -212,12 +216,19 @@ export default function TypingTask({
 
     // Keep feedback visible for 0.5 seconds, then complete
     setTimeout(() => {
+      // Get AI help if used
+      const lastAIHelp = localStorage.getItem(`lastAIHelp_g3t${taskNum}`);
+      const aiHelpData = lastAIHelp ? JSON.parse(lastAIHelp) : null;
+
       onComplete(`g3t${taskNum}`, {
         attempts: attemptsRef.current,
         totalTime: timeTaken,
         accuracy: points === 2 ? 100 : points === 1 ? 70 : 0,
-        userAnswer: input, // FIXED: was using undefined 'userValue'
-        correctAnswer: pattern, // FIXED: was using undefined 'target'
+        userAnswer: input, // Player submission
+        input: input, // Alias for compatibility
+        correctAnswer: pattern, // Ground truth
+        pattern: pattern, // Alias for compatibility
+        aiHelpValue: aiHelpData?.suggestion || null, // AI submission (if used)
         points: points,
       });
     }, 500);

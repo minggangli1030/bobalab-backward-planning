@@ -567,6 +567,14 @@ export default function ChatContainer({
     const attemptNumber = aiTaskHelper.getUniversalAttemptNumber();
     const wasCorrect = aiTaskHelper.shouldAIBeCorrect(attemptNumber);
 
+    // Get goal (ground truth) from the task
+    const goal =
+      document
+        .querySelector("[data-target-value]")
+        ?.getAttribute("data-target-value") ||
+      document.querySelector(".target-value")?.textContent ||
+      null;
+
     // Track AI help with full feedback
     eventTracker
       .logEvent("ai_help_task", {
@@ -574,6 +582,8 @@ export default function ChatContainer({
         taskType: "slider",
         helpType: "materials",
         aiFeedback: help.value,
+        aiSubmission: help.value, // What AI suggested
+        goal: goal ? parseFloat(goal) : null, // Ground truth
         wasCorrect,
         attemptNumber,
         aiDelay: aiDelay || 0,
@@ -633,6 +643,13 @@ Suggested value: ${help.value.toFixed(2)}`,
       const attemptNumber = aiTaskHelper.getUniversalAttemptNumber();
       const wasCorrect = aiTaskHelper.shouldAIBeCorrect(attemptNumber);
 
+      // Get goal (ground truth) from the task
+      const goal =
+        patternElement
+          .getAttribute("data-pattern")
+          ?.replace(/['"]/g, "")
+          .trim() || null;
+
       // Track AI help with full feedback
       eventTracker
         .logEvent("ai_help_task", {
@@ -640,6 +657,8 @@ Suggested value: ${help.value.toFixed(2)}`,
           taskType: "counting",
           helpType: "research",
           aiFeedback: suggestedCount,
+          aiSubmission: suggestedCount, // What AI suggested
+          goal: goal, // Ground truth (pattern to count)
           wasCorrect,
           attemptNumber,
           aiDelay: aiDelay || 0,
@@ -737,6 +756,8 @@ Found ${suggestedCount} ${countType}`,
             taskType: "typing",
             helpType: "engagement",
             aiFeedback: help.text,
+            aiSubmission: help.text, // What AI suggested
+            goal: pattern, // Ground truth (pattern to type)
             wasCorrect,
             attemptNumber,
             aiDelay: aiDelay || 0,
@@ -901,12 +922,16 @@ Typing: "${help.text.substring(0, 30)}${help.text.length > 30 ? "..." : ""}"`,
           <div style={{ fontSize: "10px", color: "#666", marginTop: "2px" }}>
             Mat: {categoryPoints?.materials || 0} ×{" "}
             {(1 + (categoryPoints?.research || 0) * 0.15).toFixed(2)}
+            {parseFloat(localStorage.getItem("engagementInterest") || "0") >
+              0 &&
+              ` + ${parseFloat(
+                localStorage.getItem("engagementInterest") || "0"
+              ).toFixed(1)} (Interest)`}
             {categoryPoints?.bonus
               ? ` ${categoryPoints.bonus >= 0 ? "+" : "-"} ${Math.abs(
                   categoryPoints.bonus
-                )} (Penalties)`
+                )} (Bonus)`
               : ""}
-            + Interest
           </div>
         </div>
       </div>

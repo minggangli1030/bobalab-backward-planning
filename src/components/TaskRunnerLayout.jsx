@@ -17,7 +17,8 @@ export default function TaskRunnerLayout({
   difficultyMode = "fixed", // "fixed" or "manual"
   categoryPoints = { materials: 0, research: 0, engagement: 0 },
   globalConfig = {},
-  allTasksCompleted = false
+  allTasksCompleted = false,
+  engagementInterest = 0
 }) {
   const currentTaskType = taskQueue[currentTaskIndex];
   
@@ -254,7 +255,7 @@ export default function TaskRunnerLayout({
 
         {/* Center: Points */}
         <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '12px', color: '#666', marginBottom: '4px' }}>Total Points</div>
+          <div style={{ fontSize: '12px', color: '#666', marginBottom: '4px' }}>Student Learning Score</div>
           <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#2196F3' }}>
             {points}
           </div>
@@ -280,16 +281,17 @@ export default function TaskRunnerLayout({
                   Unfinished: -{globalConfig?.unfinishedTaskPenalty || 0} pts
                 </div>
               </div>
-              {/* Earnings Column */}
+              {/* Formula Column */}
               <div>
-                <div style={{ fontWeight: '600', marginBottom: '4px', color: '#333', fontSize: '10px' }}>Earnings:</div>
+                <div style={{ fontWeight: '600', marginBottom: '4px', color: '#333', fontSize: '10px' }}>Formula:</div>
                 <div style={{ fontSize: '9px', lineHeight: '1.5' }}>
-                  Materials: {categoryPoints?.materials || 0} pts<br/>
-                  Research: {categoryPoints?.research || 0} pts<br/>
-                  Engagement: {categoryPoints?.engagement || 0} pts<br/>
+                  Mat: {categoryPoints?.materials || 0} × {(1 + (categoryPoints?.research || 0) * 0.15).toFixed(2)}<br/>
+                  {engagementInterest > 0 && (
+                    <>Interest: +{engagementInterest.toFixed(1)}<br/></>
+                  )}
                   {(penalties.switch > 0 || penalties.unfinished > 0) && (
                     <span style={{ color: '#f44336' }}>
-                      Penalties: -{penalties.switch + penalties.unfinished} pts
+                      Penalties: -{penalties.switch + penalties.unfinished}
                     </span>
                   )}
                 </div>

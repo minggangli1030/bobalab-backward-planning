@@ -175,17 +175,18 @@ export default function SliderTask({
     const difference = Math.abs(userValue - target);
     const currentTaskId = `g2t${taskNum}`;
 
-    // Check for AI help response tracking
+    // Check for AI help response tracking and get AI help data
     const lastAIHelp = localStorage.getItem(`lastAIHelp_${currentTaskId}`);
-    if (lastAIHelp) {
-      const helpData = JSON.parse(lastAIHelp);
-      const timeBetween = Date.now() - helpData.timestamp;
-      const playerAction = userValue === helpData.suggestion ? "accepted" : "modified";
+    const aiHelpData = lastAIHelp ? JSON.parse(lastAIHelp) : null;
+    
+    if (lastAIHelp && aiHelpData) {
+      const timeBetween = Date.now() - aiHelpData.timestamp;
+      const playerAction = userValue === aiHelpData.suggestion ? "accepted" : "modified";
       
       await eventTracker.trackAIHelpResponse(
         currentTaskId,
-        helpData.type,
-        helpData.suggestion,
+        aiHelpData.type,
+        aiHelpData.suggestion,
         playerAction,
         userValue,
         timeBetween
@@ -209,11 +210,14 @@ export default function SliderTask({
 
     await eventTracker.trackTaskAttempt(
       currentTaskId,
-      attemptsRef.current,
-      true, // Always passes
-      timeTaken,
-      userValue,
-      target
+      {
+        attempts: attemptsRef.current,
+        passed: true,
+        timeTaken,
+        playerSubmission: userValue, // What player submitted
+        goal: target, // Ground truth
+        aiSubmission: aiHelpData?.suggestion || null, // What AI suggested (if used)
+      }
     );
 
     const sessionId = localStorage.getItem("sessionId");
@@ -245,8 +249,11 @@ export default function SliderTask({
         attempts: attemptsRef.current,
         totalTime: timeTaken,
         accuracy: points === 2 ? 100 : points === 1 ? 70 : 0,
-        userAnswer: userValue, // or input for typing/counting
-        correctAnswer: target, // or pattern for typing
+        userAnswer: userValue, // Player submission
+        userValue: userValue, // Alias for compatibility
+        correctAnswer: target, // Ground truth
+        targetValue: target, // Alias for compatibility
+        aiHelpValue: aiHelpData?.suggestion || null, // AI submission (if used)
         points: points, // THIS IS CRITICAL - must include points
       });
     }, 500);

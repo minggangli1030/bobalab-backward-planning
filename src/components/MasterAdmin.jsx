@@ -9,6 +9,8 @@ import {
   setDoc,
   doc,
   getDoc,
+  addDoc,
+  serverTimestamp,
 } from "firebase/firestore";
 
 export default function MasterAdmin({ onClose }) {
@@ -61,12 +63,16 @@ export default function MasterAdmin({ onClose }) {
     fetchStudents();
   }, []);
 
+  const [previousGameConfig, setPreviousGameConfig] = useState(null);
+
   const loadGameConfig = async () => {
     try {
       const docRef = doc(db, "game_settings", "global");
       const docSnap = await getDoc(docRef);
       if (docSnap.exists()) {
-        setGameConfig({ ...gameConfig, ...docSnap.data() });
+        const loadedConfig = { ...gameConfig, ...docSnap.data() };
+        setGameConfig(loadedConfig);
+        setPreviousGameConfig(loadedConfig); // Store previous config for change tracking
       }
     } catch (error) {
       console.error("Error loading game config:", error);
@@ -77,7 +83,43 @@ export default function MasterAdmin({ onClose }) {
     setSavingConfig(true);
     try {
       const docRef = doc(db, "game_settings", "global");
+      const docSnap = await getDoc(docRef);
+      const oldConfig = docSnap.exists() ? docSnap.data() : {};
+
+      // Calculate what changed
+      const changes = {};
+      Object.keys(gameConfig).forEach((key) => {
+        if (
+          JSON.stringify(oldConfig[key]) !== JSON.stringify(gameConfig[key])
+        ) {
+          changes[key] = {
+            from: oldConfig[key],
+            to: gameConfig[key],
+          };
+        }
+      });
+
+      // Save new config
       await setDoc(docRef, gameConfig, { merge: true });
+
+      // Log the change to a changes collection
+      if (Object.keys(changes).length > 0) {
+        try {
+          const changesRef = collection(db, "game_settings_changes");
+          await addDoc(changesRef, {
+            timestamp: new Date().toISOString(),
+            changedAt: serverTimestamp(),
+            changes: changes,
+            changedBy: "master_admin", // Could be enhanced to track actual admin user
+            previousConfig: oldConfig,
+            newConfig: gameConfig,
+          });
+        } catch (error) {
+          console.error("Error logging config changes:", error);
+        }
+      }
+
+      setPreviousGameConfig({ ...gameConfig });
       alert("Configuration saved successfully!");
     } catch (error) {
       console.error("Error saving config:", error);

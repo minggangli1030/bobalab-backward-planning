@@ -378,17 +378,18 @@ export default function CountingTask({
     const difference = Math.abs(userAnswer - correctAnswer);
     const currentTaskId = `g1t${taskNum}`;
 
-    // Check for AI help response tracking
+    // Check for AI help response tracking and get AI help data
     const lastAIHelp = localStorage.getItem(`lastAIHelp_${currentTaskId}`);
-    if (lastAIHelp) {
-      const helpData = JSON.parse(lastAIHelp);
-      const timeBetween = Date.now() - helpData.timestamp;
-      const playerAction = userAnswer === helpData.suggestion ? "accepted" : "modified";
+    const aiHelpData = lastAIHelp ? JSON.parse(lastAIHelp) : null;
+    
+    if (lastAIHelp && aiHelpData) {
+      const timeBetween = Date.now() - aiHelpData.timestamp;
+      const playerAction = userAnswer === aiHelpData.suggestion ? "accepted" : "modified";
       
       await eventTracker.trackAIHelpResponse(
         currentTaskId,
-        helpData.type,
-        helpData.suggestion,
+        aiHelpData.type,
+        aiHelpData.suggestion,
         playerAction,
         userAnswer,
         timeBetween
@@ -412,11 +413,14 @@ export default function CountingTask({
 
     await eventTracker.trackTaskAttempt(
       currentTaskId,
-      attemptsRef.current,
-      true, // Always passes in lenient mode
-      timeTaken,
-      userAnswer,
-      correctAnswer
+      {
+        attempts: attemptsRef.current,
+        passed: true,
+        timeTaken,
+        playerSubmission: userAnswer, // What player submitted
+        goal: correctAnswer, // Ground truth
+        aiSubmission: aiHelpData?.suggestion || null, // What AI suggested (if used)
+      }
     );
 
     const sessionId = localStorage.getItem("sessionId");
@@ -449,8 +453,9 @@ export default function CountingTask({
         attempts: attemptsRef.current,
         totalTime: timeTaken,
         accuracy: points === 2 ? 100 : points === 1 ? 70 : 0,
-        userAnswer: userAnswer, // FIXED: was using undefined 'userValue'
-        correctAnswer: correctAnswer, // FIXED: was using undefined 'target'
+        userAnswer: userAnswer, // Player submission
+        correctAnswer: correctAnswer, // Ground truth
+        aiHelpValue: aiHelpData?.suggestion || null, // AI submission (if used)
         points: points,
       });
     }, 500);

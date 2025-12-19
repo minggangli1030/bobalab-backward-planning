@@ -76,8 +76,10 @@ export const eventTracker = {
 
     const event = {
       sessionId,
-      studentId: gameConfig.studentId || null, // CRITICAL: Always include studentId from gameConfig
-      username: gameConfig.displayName || gameConfig.username || gameConfig.studentId || null, // Include username/displayName
+      // Use the actual name/identifier entered by student, not Firebase document ID
+      studentId: gameConfig.studentId || gameConfig.studentIdentifier || null, // Actual student name/identifier
+      username: gameConfig.displayName || gameConfig.username || gameConfig.studentId || gameConfig.studentIdentifier || null, // Display name
+      studentIdentifier: gameConfig.studentIdentifier || gameConfig.studentId || null, // Original identifier entered
       type: eventType,
       timestamp: new Date().toISOString(), // Always ISO format
       clientTimestamp: currentTime, // Keep as milliseconds for consistency

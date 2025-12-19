@@ -1214,6 +1214,14 @@ function App() {
     await eventTracker.logEvent("task_complete", {
       taskId: tabId,
       ...data,
+      // Add goal (ground truth), player submission, and AI submission
+      goal: data.correctAnswer || data.targetValue || data.pattern || null, // Ground truth
+      playerSubmission: data.userAnswer || data.userValue || data.input || null, // What player submitted
+      aiSubmission: data.aiHelpValue || data.aiSuggestion || null, // What AI suggested (if AI help was used)
+      // Keep original fields for compatibility
+      userAnswer: data.userAnswer || data.userValue || data.input || null,
+      correctAnswer:
+        data.correctAnswer || data.targetValue || data.pattern || null,
       pointsEarned: points,
       categoryPoints: newCategoryPoints,
       studentLearningScore: newStudentLearning,
@@ -3633,12 +3641,7 @@ function App() {
           onRefill={handleRefillJar}
           onFinishNow={() => handleGameComplete("all_tasks_done")}
           allocationCounts={allocationCounts}
-          points={Math.round(
-            (categoryPoints?.materials || 0) +
-              (categoryPoints?.research || 0) +
-              (categoryPoints?.engagement || 0) -
-              (penalties.switch + penalties.unfinished)
-          )}
+          points={Math.round(calculateStudentLearning())}
           timeRemaining={timeRemaining}
           onTimeUp={() => handleGameComplete("time_up")}
           penalties={penalties}
@@ -3646,6 +3649,9 @@ function App() {
           categoryPoints={categoryPoints}
           globalConfig={globalConfig}
           allTasksCompleted={allTasksCompleted}
+          engagementInterest={
+            parseFloat(localStorage.getItem("engagementInterest") || "0") || 0
+          }
           chatInterface={
             <ChatContainer
               messages={chatMessages}
