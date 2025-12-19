@@ -278,7 +278,11 @@ export default function MasterAdmin({ onClose }) {
     }
   };
 
-  const downloadData = () => {
+  const downloadData = async () => {
+    // Ensure data is loaded
+    if (allStudents.length === 0) {
+      await fetchStudents();
+    }
     // Convert students data to CSV with unique ID
     const headers = [
       "ID", // Unique Firestore document ID
@@ -332,7 +336,11 @@ export default function MasterAdmin({ onClose }) {
     document.body.removeChild(link);
   };
 
-  const downloadSessionsData = () => {
+  const downloadSessionsData = async () => {
+    // Ensure data is loaded
+    if (allSessions.length === 0) {
+      await fetchStudents();
+    }
     // Convert sessions data to CSV with unique ID
     const headers = [
       "ID", // Unique Firestore document ID
@@ -396,7 +404,11 @@ export default function MasterAdmin({ onClose }) {
     document.body.removeChild(link);
   };
 
-  const downloadEventsData = () => {
+  const downloadEventsData = async () => {
+    // Ensure data is loaded
+    if (allEvents.length === 0) {
+      await fetchStudents();
+    }
     // Convert events data to CSV with unique ID
     // Flatten nested objects for CSV compatibility
     const headers = [
@@ -422,7 +434,7 @@ export default function MasterAdmin({ onClose }) {
       // Extract key fields for easy access
       const eventData = { ...event };
       delete eventData.id; // Remove ID from nested data to avoid duplication
-      
+
       return [
         event.id || "", // Unique Firestore ID
         event.sessionId || "",
@@ -448,11 +460,16 @@ export default function MasterAdmin({ onClose }) {
     const csvContent = [
       headers.join(","),
       ...rows.map((row) =>
-        row.map((cell) => {
-          const str = String(cell);
-          // Escape quotes and newlines
-          return `"${str.replace(/"/g, '""').replace(/\n/g, '\\n').replace(/\r/g, '\\r')}"`;
-        }).join(",")
+        row
+          .map((cell) => {
+            const str = String(cell);
+            // Escape quotes and newlines
+            return `"${str
+              .replace(/"/g, '""')
+              .replace(/\n/g, "\\n")
+              .replace(/\r/g, "\\r")}"`;
+          })
+          .join(",")
       ),
     ].join("\n");
 
@@ -471,10 +488,14 @@ export default function MasterAdmin({ onClose }) {
     document.body.removeChild(link);
   };
 
-  const downloadGameSettingsData = () => {
+  const downloadGameSettingsData = async () => {
+    // Ensure data is loaded
     if (!gameSettings) {
-      alert("No game settings found!");
-      return;
+      await fetchStudents();
+      if (!gameSettings) {
+        alert("No game settings found!");
+        return;
+      }
     }
 
     // Convert game settings to CSV
@@ -484,24 +505,31 @@ export default function MasterAdmin({ onClose }) {
       "Setting Name",
       "Setting Value (JSON)",
     ];
-    
+
     // Flatten the settings object
-    const settingsEntries = Object.entries(gameSettings).filter(([key]) => key !== 'id' && key !== 'documentId');
+    const settingsEntries = Object.entries(gameSettings).filter(
+      ([key]) => key !== "id" && key !== "documentId"
+    );
     const rows = settingsEntries.map(([key, value]) => [
       gameSettings.id || "", // Unique Firestore ID
       gameSettings.documentId || "global",
       key,
-      typeof value === 'object' ? JSON.stringify(value) : String(value),
+      typeof value === "object" ? JSON.stringify(value) : String(value),
     ]);
 
     // Create CSV content
     const csvContent = [
       headers.join(","),
       ...rows.map((row) =>
-        row.map((cell) => {
-          const str = String(cell);
-          return `"${str.replace(/"/g, '""').replace(/\n/g, '\\n').replace(/\r/g, '\\r')}"`;
-        }).join(",")
+        row
+          .map((cell) => {
+            const str = String(cell);
+            return `"${str
+              .replace(/"/g, '""')
+              .replace(/\n/g, "\\n")
+              .replace(/\r/g, "\\r")}"`;
+          })
+          .join(",")
       ),
     ].join("\n");
 

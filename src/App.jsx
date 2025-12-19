@@ -357,35 +357,33 @@ function App() {
   }, [categoryPoints]);
 
   // Helper function to calculate student learning score
+  // Formula: Materials × (1 + Research×0.15) + Engagement Interest
   const calculateStudentLearning = (
     points = categoryPoints,
     materialsBreakdown = materialsAtResearchLevel
   ) => {
-    // Calculate materials score with research multipliers applied only to future points
-    let materialsScore = 0;
-
-    // Go through each research level and calculate the materials points with appropriate multiplier
-    Object.entries(materialsBreakdown).forEach(([researchLevel, materials]) => {
-      const level = parseInt(researchLevel);
-      const multiplier = 1 + level * 0.15;
-      materialsScore += materials * multiplier;
-    });
+    const totalMaterials = points.materials || 0;
+    const researchPoints = points.research || 0;
 
     // Get accumulated interest from localStorage
     const accumulatedInterest =
       parseFloat(localStorage.getItem("engagementInterest") || "0") || 0;
 
-    const total = materialsScore + accumulatedInterest + (points.bonus || 0);
+    // Formula: Materials × (1 + Research×0.15) + Engagement Interest
+    const materialsWithMultiplier =
+      totalMaterials * (1 + researchPoints * 0.15);
+    const total =
+      materialsWithMultiplier + accumulatedInterest + (points.bonus || 0);
 
     // Student Learning Points Update with new formula display
-    const totalMaterials = points.materials || 0;
-    const researchPoints = points.research || 0;
     console.log(
       `📊 STUDENT LEARNING: ${total.toFixed(
         1
-      )} pts | Materials: ${totalMaterials} (with sequential multipliers) | Research: ${researchPoints} | Interest: ${accumulatedInterest.toFixed(
+      )} pts | Materials: ${totalMaterials} × (1 + ${researchPoints}×0.15) = ${materialsWithMultiplier.toFixed(
         1
-      )} = ${total.toFixed(1)}`
+      )} | Interest: ${accumulatedInterest.toFixed(1)} | Total: ${total.toFixed(
+        1
+      )}`
     );
 
     return isNaN(total) ? 0 : total;
@@ -1127,15 +1125,10 @@ function App() {
       };
     }
 
-    // Calculate materials score with proper multipliers
-    let materialsScore = 0;
-    Object.entries(newMaterialsBreakdown).forEach(
-      ([researchLevel, materials]) => {
-        const level = parseInt(researchLevel);
-        const multiplier = 1 + level * 0.15;
-        materialsScore += materials * multiplier;
-      }
-    );
+    // Calculate materials score with new formula: Materials × (1 + Research×0.15)
+    const totalMaterials = finalCategoryPoints.materials || 0;
+    const researchPoints = finalCategoryPoints.research || 0;
+    const materialsScore = totalMaterials * (1 + researchPoints * 0.15);
 
     // Add engagement interest to accumulated interest
     const previousInterest = parseFloat(

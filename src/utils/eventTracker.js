@@ -2,6 +2,9 @@
 import { db } from '../firebase';
 import { collection, addDoc } from 'firebase/firestore';
 
+// Store pending events for offline sync
+const pendingEvents = [];
+
 export const eventTracker = {
   // Initialize session properly when module loads
   init() {
@@ -12,6 +15,35 @@ export const eventTracker = {
     // Initialize semester time if not set
     if (!localStorage.getItem("semesterStartTime")) {
       localStorage.setItem("semesterStartTime", Date.now().toString());
+    }
+    
+    // Set up beforeunload handler to save pending events
+    window.addEventListener("beforeunload", () => {
+      this.flushPendingEvents();
+    });
+    
+    // Also save on pagehide (more reliable than beforeunload)
+    window.addEventListener("pagehide", () => {
+      this.flushPendingEvents();
+    });
+  },
+  
+  // Flush pending events to Firestore
+  async flushPendingEvents() {
+    if (pendingEvents.length === 0) return;
+    
+    const eventsToFlush = [...pendingEvents];
+    pendingEvents.length = 0; // Clear array
+    
+    // Try to save all pending events
+    for (const event of eventsToFlush) {
+      try {
+        await addDoc(collection(db, "events"), event);
+      } catch (error) {
+        console.error("Failed to flush pending event:", error);
+        // Re-add to pending if save failed
+        pendingEvents.push(event);
+      }
     }
   },
 
@@ -88,9 +120,17 @@ export const eventTracker = {
     }
 
     try {
-      await addDoc(collection(db, "events"), event);
+      // Try to save immediately (non-blocking)
+      addDoc(collection(db, "events"), event).catch((error) => {
+        console.error("Failed to log event immediately:", error);
+        // Store in pending events for retry
+        pendingEvents.push(event);
+        this.storeOfflineEvent(event);
+      });
     } catch (error) {
       console.error("Failed to log event:", error);
+      // Store in pending events for retry
+      pendingEvents.push(event);
       this.storeOfflineEvent(event);
     }
   },
@@ -348,6 +388,21 @@ export const eventTracker = {
       wasCorrect,
       attemptNumber,
     });
+  },
+
+  // Store event offline for later sync
+  storeOfflineEvent(event) {
+    try {
+      const offlineEvents = JSON.parse(localStorage.getItem("offlineEvents") || "[]");
+      offlineEvents.push(event);
+      // Keep only last 1000 events to avoid localStorage overflow
+      if (offlineEvents.length > 1000) {
+        offlineEvents.shift();
+      }
+      localStorage.setItem("offlineEvents", JSON.stringify(offlineEvents));
+    } catch (error) {
+      console.error("Failed to store offline event:", error);
+    }
   },
 };
 
