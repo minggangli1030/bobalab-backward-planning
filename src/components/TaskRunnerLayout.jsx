@@ -52,12 +52,22 @@ export default function TaskRunnerLayout({
   // If all tasks are completed, show empty jars (all 0)
   const upcomingQueue = allTasksCompleted ? [] : taskQueue.slice(currentTaskIndex); // Includes current
   
-  // Determine difficulty from task ID: 1-5 = easy, 6-10 = medium, 11+ = hard
+  // Determine difficulty from task ID
+  // Manual mode: 1-5 = easy, 6-10 = medium, 11+ = hard
+  // Fixed mode: 1-25 = easy, 26-40 = medium, 41+ = hard
   const getDifficulty = (taskId) => {
     const taskNum = parseInt(taskId.substring(3)) || 1;
-    if (taskNum <= 5) return 'easy';
-    if (taskNum <= 10) return 'medium';
-    return 'hard';
+    if (difficultyMode === 'manual') {
+      // Manual mode uses old mapping
+      if (taskNum <= 5) return 'easy';
+      if (taskNum <= 10) return 'medium';
+      return 'hard';
+    } else {
+      // Fixed mode uses new mapping
+      if (taskNum <= 25) return 'easy';
+      if (taskNum <= 40) return 'medium';
+      return 'hard';
+    }
   };
   
   // Group tasks by type and difficulty for manual mode (9 jars)

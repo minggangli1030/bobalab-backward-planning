@@ -40,10 +40,12 @@ export const eventTracker = {
     // Get full game context from localStorage/sessionStorage
     const gameConfig = JSON.parse(sessionStorage.getItem("gameConfig") || "{}");
     const gameContext = this.getFullGameContext();
+    const globalConfig = JSON.parse(localStorage.getItem("globalConfig") || "{}");
 
     const event = {
       sessionId,
       studentId: gameConfig.studentId || null, // CRITICAL: Always include studentId from gameConfig
+      username: gameConfig.displayName || gameConfig.username || gameConfig.studentId || null, // Include username/displayName
       type: eventType,
       timestamp: new Date().toISOString(), // Always ISO format
       clientTimestamp: currentTime, // Keep as milliseconds for consistency
@@ -57,6 +59,24 @@ export const eventTracker = {
       hasCheckpoint: gameConfig.checkpointSemester2 || false,
       hasAI: gameConfig.hasAI || false,
       section: gameConfig.section || null, // Include section info
+      // Add ALL globalConfig settings for complete tracking
+      gameConfig: {
+        semesterDuration: globalConfig.semesterDuration || 12,
+        totalTasks: globalConfig.totalTasks || 10,
+        totalSemesters: globalConfig.totalSemesters || 2,
+        midtermEnabled: globalConfig.midtermEnabled || false,
+        aiCost: globalConfig.aiCost || 0,
+        wrongAnswerPenalty: globalConfig.wrongAnswerPenalty || 0,
+        switchCost: globalConfig.switchCost || 0,
+        jarRefillFreezeTime: globalConfig.jarRefillFreezeTime || 0,
+        unfinishedJarPenalty: globalConfig.unfinishedJarPenalty || 0,
+        unfinishedTaskPenalty: globalConfig.unfinishedTaskPenalty || 0,
+        aiDelay: globalConfig.aiDelay || 0,
+        taskOrderStrategy: globalConfig.taskOrderStrategy || "sequential_task",
+        difficultyMode: globalConfig.difficultyMode || "fixed",
+        gameMode: globalConfig.gameMode || "knapsack",
+        scoring: globalConfig.scoring || null, // Full scoring configuration
+      },
       // Event-specific data goes last to allow overrides
       ...this.convertTimesToSeconds(eventData), // Convert all time fields to seconds
       // REMOVED: userAgent and screenResolution

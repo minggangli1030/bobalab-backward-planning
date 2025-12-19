@@ -92,6 +92,9 @@ export default function MasterAdmin({ onClose }) {
   };
 
   const [allSessions, setAllSessions] = useState([]);
+  const [allEvents, setAllEvents] = useState([]);
+  const [allStudents, setAllStudents] = useState([]);
+  const [gameSettings, setGameSettings] = useState(null);
 
   const fetchStudents = async () => {
     setLoading(true);
@@ -100,6 +103,12 @@ export default function MasterAdmin({ onClose }) {
       const studentsRef = collection(db, "students");
       const studentSnap = await getDocs(studentsRef);
       const rosterMap = {};
+
+      const studentsData = studentSnap.docs.map((doc) => ({
+        id: doc.id, // Unique ID from Firestore
+        ...doc.data(),
+      }));
+      setAllStudents(studentsData);
 
       studentSnap.docs.forEach((doc) => {
         rosterMap[doc.id] = { id: doc.id, ...doc.data() };
@@ -110,12 +119,32 @@ export default function MasterAdmin({ onClose }) {
       // Optional: Query only relevant fields if possible, but for now fetch all to be safe
       const sessionsSnap = await getDocs(sessionsRef);
 
-      // Store all sessions for download
+      // Store all sessions for download with unique ID
       const sessionsData = sessionsSnap.docs.map((doc) => ({
-        id: doc.id,
+        id: doc.id, // Unique ID from Firestore
         ...doc.data(),
       }));
       setAllSessions(sessionsData);
+
+      // 3. Fetch Events
+      const eventsRef = collection(db, "events");
+      const eventsSnap = await getDocs(eventsRef);
+      const eventsData = eventsSnap.docs.map((doc) => ({
+        id: doc.id, // Unique ID from Firestore
+        ...doc.data(),
+      }));
+      setAllEvents(eventsData);
+
+      // 4. Fetch Game Settings
+      const settingsRef = doc(db, "game_settings", "global");
+      const settingsSnap = await getDoc(settingsRef);
+      if (settingsSnap.exists()) {
+        setGameSettings({
+          id: settingsSnap.id, // Unique ID
+          documentId: "global", // Document ID
+          ...settingsSnap.data(),
+        });
+      }
 
       console.log(
         `Debug: Found ${studentSnap.size} students and ${sessionsSnap.size} sessions`
@@ -250,8 +279,9 @@ export default function MasterAdmin({ onClose }) {
   };
 
   const downloadData = () => {
-    // Convert students data to CSV
+    // Convert students data to CSV with unique ID
     const headers = [
+      "ID", // Unique Firestore document ID
       "Student ID",
       "Section",
       "Has Played",
@@ -259,7 +289,7 @@ export default function MasterAdmin({ onClose }) {
       "Total Accesses",
       "Highest Score",
     ];
-    const rows = students
+    const rows = allStudents
       .filter((s) => !s.section?.includes("ADMIN"))
       .map((student) => {
         const highestScore =
@@ -267,6 +297,7 @@ export default function MasterAdmin({ onClose }) {
             ? Math.max(...student.scores.map((s) => s.total || 0))
             : 0;
         return [
+          student.id || "", // Unique Firestore ID
           student.sid || student.id || "",
           student.section || "N/A",
           student.hasPlayed ? "Yes" : "No",
@@ -293,7 +324,7 @@ export default function MasterAdmin({ onClose }) {
     link.setAttribute("href", url);
     link.setAttribute(
       "download",
-      `student_data_${new Date().toISOString().split("T")[0]}.csv`
+      `students_${new Date().toISOString().split("T")[0]}.csv`
     );
     link.style.visibility = "hidden";
     document.body.appendChild(link);
@@ -302,9 +333,10 @@ export default function MasterAdmin({ onClose }) {
   };
 
   const downloadSessionsData = () => {
-    // Convert sessions data to CSV
+    // Convert sessions data to CSV with unique ID
     const headers = [
-      "Session ID",
+      "ID", // Unique Firestore document ID
+      "Session ID", // Legacy field (same as ID)
       "Student ID",
       "Section",
       "Start Time",
@@ -326,7 +358,8 @@ export default function MasterAdmin({ onClose }) {
         : 0;
 
       return [
-        session.id || "",
+        session.id || "", // Unique Firestore ID
+        session.id || "", // Session ID (same as ID for compatibility)
         session.studentId || "",
         session.section || "N/A",
         startTime,
@@ -355,12 +388,144 @@ export default function MasterAdmin({ onClose }) {
     link.setAttribute("href", url);
     link.setAttribute(
       "download",
-      `sessions_data_${new Date().toISOString().split("T")[0]}.csv`
+      `sessions_${new Date().toISOString().split("T")[0]}.csv`
     );
     link.style.visibility = "hidden";
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  const downloadEventsData = () => {
+    // Convert events data to CSV with unique ID
+    // Flatten nested objects for CSV compatibility
+    const headers = [
+      "ID", // Unique Firestore document ID
+      "Session ID",
+      "Student ID",
+      "Username",
+      "Type",
+      "Timestamp",
+      "Client Timestamp",
+      "Time Elapsed Seconds",
+      "Readable Time",
+      "Current Task",
+      "Game Mode",
+      "Current Semester",
+      "Total Switches",
+      "AI Usage Count",
+      "Student Learning Score",
+      "Total Score",
+      "Event Data (JSON)", // Store full event data as JSON string
+    ];
+    const rows = allEvents.map((event) => {
+      // Extract key fields for easy access
+      const eventData = { ...event };
+      delete eventData.id; // Remove ID from nested data to avoid duplication
+      
+      return [
+        event.id || "", // Unique Firestore ID
+        event.sessionId || "",
+        event.studentId || "",
+        event.username || "",
+        event.type || "",
+        event.timestamp || "",
+        event.clientTimestamp || "",
+        event.timeElapsedSeconds || "",
+        event.readableTime || "",
+        event.currentTask || "",
+        event.gameMode || "",
+        event.currentSemester || "",
+        event.totalSwitches || "",
+        event.aiUsageCount || "",
+        event.studentLearning || event.studentLearningScore || "",
+        event.totalScore || event.finalScore || "",
+        JSON.stringify(eventData), // Full event data as JSON
+      ];
+    });
+
+    // Create CSV content
+    const csvContent = [
+      headers.join(","),
+      ...rows.map((row) =>
+        row.map((cell) => {
+          const str = String(cell);
+          // Escape quotes and newlines
+          return `"${str.replace(/"/g, '""').replace(/\n/g, '\\n').replace(/\r/g, '\\r')}"`;
+        }).join(",")
+      ),
+    ].join("\n");
+
+    // Create download link
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute(
+      "download",
+      `events_${new Date().toISOString().split("T")[0]}.csv`
+    );
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const downloadGameSettingsData = () => {
+    if (!gameSettings) {
+      alert("No game settings found!");
+      return;
+    }
+
+    // Convert game settings to CSV
+    const headers = [
+      "ID", // Unique Firestore document ID
+      "Document ID",
+      "Setting Name",
+      "Setting Value (JSON)",
+    ];
+    
+    // Flatten the settings object
+    const settingsEntries = Object.entries(gameSettings).filter(([key]) => key !== 'id' && key !== 'documentId');
+    const rows = settingsEntries.map(([key, value]) => [
+      gameSettings.id || "", // Unique Firestore ID
+      gameSettings.documentId || "global",
+      key,
+      typeof value === 'object' ? JSON.stringify(value) : String(value),
+    ]);
+
+    // Create CSV content
+    const csvContent = [
+      headers.join(","),
+      ...rows.map((row) =>
+        row.map((cell) => {
+          const str = String(cell);
+          return `"${str.replace(/"/g, '""').replace(/\n/g, '\\n').replace(/\r/g, '\\r')}"`;
+        }).join(",")
+      ),
+    ].join("\n");
+
+    // Create download link
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute(
+      "download",
+      `game_settings_${new Date().toISOString().split("T")[0]}.csv`
+    );
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const downloadAllData = () => {
+    // Download all data types sequentially
+    downloadData();
+    setTimeout(() => downloadSessionsData(), 500);
+    setTimeout(() => downloadEventsData(), 1000);
+    setTimeout(() => downloadGameSettingsData(), 1500);
   };
 
   const tabButtonStyle = (isActive) => ({
@@ -1148,7 +1313,22 @@ export default function MasterAdmin({ onClose }) {
             }}
           >
             <h2 style={{ margin: 0, fontSize: "18px" }}>Active Sessions</h2>
-            <div style={{ display: "flex", gap: "10px" }}>
+            <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+              <button
+                onClick={downloadAllData}
+                style={{
+                  padding: "10px 20px",
+                  background: "#9C27B0",
+                  color: "white",
+                  border: "none",
+                  borderRadius: "6px",
+                  cursor: "pointer",
+                  fontWeight: "600",
+                  fontSize: "14px",
+                }}
+              >
+                📦 Download All Data
+              </button>
               <button
                 onClick={downloadData}
                 style={{
@@ -1159,9 +1339,10 @@ export default function MasterAdmin({ onClose }) {
                   borderRadius: "6px",
                   cursor: "pointer",
                   fontWeight: "500",
+                  fontSize: "13px",
                 }}
               >
-                📥 Download Student Data
+                📥 Students
               </button>
               <button
                 onClick={downloadSessionsData}
@@ -1173,9 +1354,40 @@ export default function MasterAdmin({ onClose }) {
                   borderRadius: "6px",
                   cursor: "pointer",
                   fontWeight: "500",
+                  fontSize: "13px",
                 }}
               >
-                📥 Download Sessions Data
+                📥 Sessions
+              </button>
+              <button
+                onClick={downloadEventsData}
+                style={{
+                  padding: "10px 20px",
+                  background: "#FF9800",
+                  color: "white",
+                  border: "none",
+                  borderRadius: "6px",
+                  cursor: "pointer",
+                  fontWeight: "500",
+                  fontSize: "13px",
+                }}
+              >
+                📥 Events
+              </button>
+              <button
+                onClick={downloadGameSettingsData}
+                style={{
+                  padding: "10px 20px",
+                  background: "#9E9E9E",
+                  color: "white",
+                  border: "none",
+                  borderRadius: "6px",
+                  cursor: "pointer",
+                  fontWeight: "500",
+                  fontSize: "13px",
+                }}
+              >
+                📥 Settings
               </button>
               <button
                 onClick={resetAllData}
@@ -1188,6 +1400,7 @@ export default function MasterAdmin({ onClose }) {
                   borderRadius: "6px",
                   cursor: refreshing ? "not-allowed" : "pointer",
                   fontWeight: "500",
+                  fontSize: "13px",
                   opacity: refreshing ? 0.6 : 1,
                 }}
               >

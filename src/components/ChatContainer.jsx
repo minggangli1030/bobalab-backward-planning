@@ -567,13 +567,19 @@ export default function ChatContainer({
     const attemptNumber = aiTaskHelper.getUniversalAttemptNumber();
     const wasCorrect = aiTaskHelper.shouldAIBeCorrect(attemptNumber);
 
-    eventTracker.trackAITaskHelp(
-      currentTask,
-      "slider",
-      help.value,
-      wasCorrect,
-      attemptNumber
-    );
+    // Track AI help with full feedback
+    eventTracker
+      .logEvent("ai_help_task", {
+        taskId: currentTask,
+        taskType: "slider",
+        helpType: "materials",
+        aiFeedback: help.value,
+        wasCorrect,
+        attemptNumber,
+        aiDelay: aiDelay || 0,
+        currentScore: calculateStudentLearning(),
+      })
+      .catch((err) => console.error("Error tracking slider help:", err));
 
     // Store help data for tracking response later
     localStorage.setItem(
@@ -627,13 +633,22 @@ Suggested value: ${help.value.toFixed(2)}`,
       const attemptNumber = aiTaskHelper.getUniversalAttemptNumber();
       const wasCorrect = aiTaskHelper.shouldAIBeCorrect(attemptNumber);
 
-      eventTracker.trackAITaskHelp(
-        currentTask,
-        "counting",
-        suggestedCount,
-        wasCorrect,
-        attemptNumber
-      );
+      // Track AI help with full feedback
+      eventTracker
+        .logEvent("ai_help_task", {
+          taskId: currentTask,
+          taskType: "counting",
+          helpType: "research",
+          aiFeedback: suggestedCount,
+          wasCorrect,
+          attemptNumber,
+          aiDelay: aiDelay || 0,
+          currentScore: calculateStudentLearning(),
+          highlightedWords: help.highlightWords || [],
+          targetLetters: help.targetLetters || [],
+          isMultiLetter: help.isMultiLetter || false,
+        })
+        .catch((err) => console.error("Error tracking counting help:", err));
 
       // Store help data for tracking response later
       localStorage.setItem(
@@ -689,12 +704,16 @@ Found ${suggestedCount} ${countType}`,
       },
     ]);
 
-    // Log planning help request
-    eventTracker.trackUserAction("planning_help_requested", {
-      response: response,
-      currentTask: currentTask,
-      timestamp: Date.now(),
-    });
+    // Log planning help request with full AI feedback
+    eventTracker
+      .logEvent("ai_help_plan", {
+        helpType: "planning",
+        aiFeedback: response,
+        currentTask: currentTask,
+        aiDelay: aiDelay,
+        timestamp: Date.now(),
+      })
+      .catch((err) => console.error("Error tracking planning help:", err));
   };
 
   // Handler for typing help (Engagement) - FIXED
@@ -711,13 +730,20 @@ Found ${suggestedCount} ${countType}`,
         const attemptNumber = aiTaskHelper.getUniversalAttemptNumber();
         const wasCorrect = help.perfect;
 
-        eventTracker.trackAITaskHelp(
-          currentTask,
-          "typing",
-          help.text,
-          wasCorrect,
-          attemptNumber
-        );
+        // Track AI help with full feedback
+        eventTracker
+          .logEvent("ai_help_task", {
+            taskId: currentTask,
+            taskType: "typing",
+            helpType: "engagement",
+            aiFeedback: help.text,
+            wasCorrect,
+            attemptNumber,
+            aiDelay: aiDelay || 0,
+            currentScore: calculateStudentLearning(),
+            originalPattern: pattern,
+          })
+          .catch((err) => console.error("Error tracking typing help:", err));
 
         // Store help data for tracking response later
         localStorage.setItem(

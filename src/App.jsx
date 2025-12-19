@@ -172,6 +172,8 @@ function App() {
         if (docSnap.exists()) {
           const data = docSnap.data();
           setGlobalConfig((prev) => ({ ...prev, ...data }));
+          // Store in localStorage for eventTracker access
+          localStorage.setItem("globalConfig", JSON.stringify({ ...data }));
 
           // Apply time settings immediately
           if (data.semesterDuration) {
@@ -974,6 +976,25 @@ function App() {
     setTaskQueue(finalQueue);
     setSwitches((prev) => prev + 1);
 
+    // Track switch event with full details
+    eventTracker
+      .logEvent("task_switch", {
+        fromTask: taskQueue[currentTaskIndex],
+        toTaskType: targetTaskType,
+        toDifficulty: targetDifficulty,
+        switchCost: cost,
+        currentTaskIndex,
+        queueLength: finalQueue.length,
+        totalSwitches: switches + 1,
+        currentScore: Math.round(
+          (categoryPoints?.materials || 0) +
+            (categoryPoints?.research || 0) +
+            (categoryPoints?.engagement || 0) -
+            (penalties.switch + penalties.unfinished)
+        ),
+      })
+      .catch((err) => console.error("Error tracking switch:", err));
+
     // Update Current Tab to the first item of the new block (which is the first of targetTypeItems)
     // Update UI immediately for better responsiveness
     if (targetTypeItems.length > 0) {
@@ -1189,6 +1210,14 @@ function App() {
       data.accuracy || data.difference || 0
     );
 
+    // Calculate total score at completion
+    const totalScore = Math.round(
+      (newCategoryPoints.materials || 0) +
+        (newCategoryPoints.research || 0) +
+        (newCategoryPoints.engagement || 0) -
+        (penalties.switch + penalties.unfinished)
+    );
+
     await eventTracker.logEvent("task_complete", {
       taskId: tabId,
       ...data,
@@ -1196,6 +1225,7 @@ function App() {
       categoryPoints: newCategoryPoints,
       studentLearningScore: newStudentLearning,
       engagementInterest: newInterest,
+      totalScore: totalScore, // Add total score
       completionContext: {
         totalTasksCompleted: Object.keys(completed).length + 1,
         currentGameTime: globalTimer,
@@ -1477,6 +1507,19 @@ function App() {
         if (!isChatOpen) {
           setUnreadCount((prev) => prev + 1);
         }
+
+        // Track AI chat message with full feedback
+        eventTracker
+          .logEvent("ai_chat_message", {
+            userMessage: text,
+            aiResponse: responseText,
+            currentTask: currentTab,
+            context: context,
+            aiDelay: delay / 1000, // Convert to seconds
+            currentScore: Math.round(studentLearningScore),
+            timeRemaining,
+          })
+          .catch((err) => console.error("Error tracking AI chat:", err));
 
         // Apply AI Cost if configured
         if (globalConfig.aiCost > 0) {
@@ -1771,6 +1814,7 @@ function App() {
                 setCompleted({});
                 setTaskQueue([]);
                 setCurrentTaskIndex(0);
+                setAllTasksCompleted(false); // Reset completion flag for new semester
                 setStudentLearningScore(0); // Reset score? Or keep cumulative? Usually reset or keep?
                 // User said "reassign number for each task", implying a fresh start for the semester's tasks.
 
@@ -2795,6 +2839,9 @@ function App() {
       setPausedTime(0);
       setCurrentTab("g2t1"); // Start with materials
       setCheckpointReached(false);
+      setAllTasksCompleted(false); // Reset completion flag for new semester
+      setCurrentTaskIndex(0); // Reset task index
+      setTaskQueue([]); // Reset task queue
 
       const newSeed = Math.floor(Math.random() * 1000000);
       setRandomSeed(newSeed);
@@ -3306,30 +3353,89 @@ function App() {
       [type, difficulty] = jarKey.split("-");
     }
 
+    const taskTypeName =
+      type === "g1" ? "Research" : type === "g2" ? "Materials" : "Engagement";
+    const freezeTime = globalConfig.jarRefillFreezeTime || 0;
+
+    // Track refill event
+    eventTracker
+      .logEvent("jar_refill", {
+        jarKey,
+        taskType: type,
+        taskTypeName,
+        difficulty,
+        freezeTime,
+        currentTaskIndex,
+        queueLength: taskQueue.length,
+        allTasksCompleted,
+        currentScore: Math.round(
+          (categoryPoints?.materials || 0) +
+            (categoryPoints?.research || 0) +
+            (categoryPoints?.engagement || 0) -
+            (penalties.switch + penalties.unfinished)
+        ),
+        timeRemaining,
+      })
+      .catch((err) => console.error("Error tracking refill:", err));
+
     // Refill costs TIME (freeze screen but timer keeps running), not points
     // Freeze the screen for the configured freeze time
-    if (globalConfig.jarRefillFreezeTime > 0) {
+    if (freezeTime > 0) {
       // Freeze screen but timer keeps running (this is the cost)
       setGameBlocked(true);
       setAccessDeniedReason(
-        `Refilling ${
-          type === "g1"
-            ? "Research"
-            : type === "g2"
-            ? "Materials"
-            : "Engagement"
-        }${difficulty ? ` (${difficulty})` : ""} Jar...`
+        `Refilling ${taskTypeName}${
+          difficulty ? ` (${difficulty})` : ""
+        } Jar...`
       );
 
       setTimeout(() => {
         setGameBlocked(false);
         setAccessDeniedReason("");
-        addTasksToQueue(type, difficulty, 1); // Add 1 task with specified difficulty
-        setAllTasksCompleted(false); // Reset completion flag if refilling
-      }, globalConfig.jarRefillFreezeTime * 1000);
+        // Add task and auto-switch to it without penalty
+        addTasksToQueue(type, difficulty, 1, (newTaskId, newTaskIndex) => {
+          setAllTasksCompleted(false); // Reset completion flag if refilling
+          setCurrentTaskIndex(newTaskIndex);
+          // Track successful refill completion
+          eventTracker
+            .logEvent("jar_refill_complete", {
+              jarKey,
+              taskType: type,
+              difficulty,
+              newTaskId,
+              newTaskIndex,
+            })
+            .catch((err) =>
+              console.error("Error tracking refill complete:", err)
+            );
+          // Switch to new task without penalty (this is a refill, not a manual switch)
+          handleTabSwitch(newTaskId, true).catch((err) =>
+            console.error("Error switching to refilled task:", err)
+          );
+        });
+      }, freezeTime * 1000);
     } else {
-      addTasksToQueue(type, difficulty, 1);
-      setAllTasksCompleted(false); // Reset completion flag if refilling
+      // Add task and auto-switch to it without penalty
+      addTasksToQueue(type, difficulty, 1, (newTaskId, newTaskIndex) => {
+        setAllTasksCompleted(false); // Reset completion flag if refilling
+        setCurrentTaskIndex(newTaskIndex);
+        // Track successful refill completion
+        eventTracker
+          .logEvent("jar_refill_complete", {
+            jarKey,
+            taskType: type,
+            difficulty,
+            newTaskId,
+            newTaskIndex,
+          })
+          .catch((err) =>
+            console.error("Error tracking refill complete:", err)
+          );
+        // Switch to new task without penalty (this is a refill, not a manual switch)
+        handleTabSwitch(newTaskId, true).catch((err) =>
+          console.error("Error switching to refilled task:", err)
+        );
+      });
     }
   };
 
@@ -3348,48 +3454,91 @@ function App() {
     }
   };
 
-  // KNAPSACK MODE ONLY: Add tasks to the queue when refilling jars
-  const addTasksToQueue = (type, difficulty, count) => {
-    // Generate new task IDs with the specified difficulty
-    // Difficulty mapping: easy = 1-5, medium = 6-10, hard = 11+
+  // Helper function to get difficulty from level number
+  // Fixed mode: 1-25 = easy, 26-40 = medium, 41+ = hard
+  // Manual mode: 1-5 = easy, 6-10 = medium, 11+ = hard
+  const getDifficultyFromLevel = (level, isManualMode) => {
+    if (isManualMode) {
+      if (level <= 5) return "easy";
+      if (level <= 10) return "medium";
+      return "hard";
+    } else {
+      if (level <= 25) return "easy";
+      if (level <= 40) return "medium";
+      return "hard";
+    }
+  };
 
+  // KNAPSACK MODE ONLY: Add tasks to the queue when refilling jars
+  const addTasksToQueue = (type, difficulty, count, callback) => {
+    const isManualMode = globalConfig.difficultyMode === "manual";
+    let highestLevel = 0;
+
+    if (!difficulty || !isManualMode) {
+      // Fixed mode: Find highest completed level for this task type (any difficulty)
+      const completedTasksOfType = Object.keys(completed).filter((taskId) => {
+        const baseId = taskId.split("_")[0]; // Remove timestamp if present
+        return baseId.startsWith(type);
+      });
+
+      if (completedTasksOfType.length > 0) {
+        const levels = completedTasksOfType.map((taskId) => {
+          const baseId = taskId.split("_")[0];
+          const match = baseId.match(new RegExp(`${type}t(\\d+)`));
+          return match ? parseInt(match[1]) : 0;
+        });
+        highestLevel = Math.max(...levels);
+      }
+    }
+
+    // Generate new tasks
     const newTasks = [];
     for (let i = 0; i < count; i++) {
       let taskNum;
 
-      if (difficulty) {
-        // Manual mode: use specific difficulty range
+      if (difficulty && isManualMode) {
+        // Manual mode: Calculate level based on completed count and difficulty
+        const completedCount = Object.keys(completed).filter((taskId) => {
+          const baseId = taskId.split("_")[0];
+          if (!baseId.startsWith(type)) return false;
+          const match = baseId.match(new RegExp(`${type}t(\\d+)`));
+          if (!match) return false;
+          const level = parseInt(match[1]);
+          return getDifficultyFromLevel(level, true) === difficulty;
+        }).length;
+
         if (difficulty === "easy") {
-          taskNum = Math.floor(Math.random() * 5) + 1; // 1-5
+          // Easy: wrap around levels 1-5
+          // 1st easy = 1, 2nd = 2, ..., 5th = 5, 6th = 1, 7th = 2, 50th = 5, 51st = 1, etc.
+          taskNum = ((completedCount + i) % 5) + 1;
         } else if (difficulty === "medium") {
-          taskNum = Math.floor(Math.random() * 5) + 6; // 6-10
+          // Medium: wrap around levels 6-10
+          // 1st medium = 6, 2nd = 7, ..., 5th = 10, 6th = 6, 7th = 7, 50th = 10, 51st = 6, etc.
+          taskNum = ((completedCount + i) % 5) + 6;
         } else {
-          // hard
-          taskNum = Math.floor(Math.random() * 10) + 11; // 11-20
+          // Hard: no wrap, just increment from 11
+          // 1st hard = 11, 2nd = 12, 50th = 60, etc.
+          taskNum = 11 + completedCount + i;
         }
       } else {
-        // Fixed mode: random difficulty
-        taskNum = Math.floor(Math.random() * 20) + 1; // 1-20
+        // Fixed mode: sequential level
+        taskNum = highestLevel + 1 + i;
       }
 
-      // Generate a unique task ID by checking existing queue and completed tasks
-      const newTaskId = `${type}t${taskNum}`;
-
-      // Check if this task ID already exists in queue or completed
-      const existsInQueue = taskQueue.includes(newTaskId);
-      const existsInCompleted = completed[newTaskId] !== undefined;
-
-      // If exists, generate a new one with a timestamp suffix to ensure uniqueness
-      if (existsInQueue || existsInCompleted) {
-        const timestamp = Date.now();
-        const uniqueId = `${type}t${taskNum}_${timestamp}`;
-        newTasks.push(uniqueId);
-      } else {
-        newTasks.push(newTaskId);
-      }
+      // Always generate unique task ID with timestamp to prevent respawning completed tasks
+      const timestamp = Date.now() + i; // Add i to ensure uniqueness if multiple tasks added
+      const uniqueId = `${type}t${taskNum}_${timestamp}`;
+      newTasks.push(uniqueId);
     }
 
-    setTaskQueue((prev) => [...prev, ...newTasks]);
+    setTaskQueue((prev) => {
+      const updatedQueue = [...prev, ...newTasks];
+      // Call callback with the first new task ID to auto-switch to it
+      if (callback && newTasks.length > 0) {
+        callback(newTasks[0], updatedQueue.length - newTasks.length);
+      }
+      return updatedQueue;
+    });
   };
 
   // Render Task Runner
@@ -3492,7 +3641,10 @@ function App() {
           onFinishNow={() => handleGameComplete("all_tasks_done")}
           allocationCounts={allocationCounts}
           points={Math.round(
-            studentLearningScore - (penalties.switch + penalties.unfinished)
+            (categoryPoints?.materials || 0) +
+              (categoryPoints?.research || 0) +
+              (categoryPoints?.engagement || 0) -
+              (penalties.switch + penalties.unfinished)
           )}
           timeRemaining={timeRemaining}
           onTimeUp={() => handleGameComplete("time_up")}
