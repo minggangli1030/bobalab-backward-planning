@@ -399,7 +399,7 @@ function App() {
       setStudentLearningScore(currentScore);
     }, 2000);
     return () => clearInterval(interval);
-  }, [categoryPoints, materialsAtResearchLevel]);
+  }, [categoryPoints, materialsAtResearchLevel, penalties]);
 
   const [tick, setTick] = useState(0);
 
@@ -3410,7 +3410,10 @@ function App() {
           onSwitchTask={handleSwitchTask}
           onRefill={handleRefillJar}
           allocationCounts={allocationCounts}
-          points={Math.round(studentLearningScore)}
+          points={Math.round(
+            studentLearningScore -
+              (penalties.switch + penalties.refill + penalties.unfinished)
+          )}
           timeRemaining={timeRemaining}
           onTimeUp={() => handleGameComplete("time_up")}
           penalties={penalties}
