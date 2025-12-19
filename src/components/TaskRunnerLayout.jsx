@@ -7,6 +7,7 @@ export default function TaskRunnerLayout({
   taskQueue,
   onSwitchTask,
   onRefill,
+  onFinishNow,
   children,
   points,
   timeRemaining,
@@ -15,7 +16,8 @@ export default function TaskRunnerLayout({
   chatInterface,
   difficultyMode = "fixed", // "fixed" or "manual"
   categoryPoints = { materials: 0, research: 0, engagement: 0 },
-  globalConfig = {}
+  globalConfig = {},
+  allTasksCompleted = false
 }) {
   const currentTaskType = taskQueue[currentTaskIndex];
   
@@ -97,8 +99,9 @@ export default function TaskRunnerLayout({
     const isActiveType = isCurrent(jarKey);
     const hasTasks = count > 0;
     
-    // Extract base type for switching (e.g., 'g2' from 'g2-easy')
-    const baseType = difficultyMode === 'manual' ? jarKey.split('-')[0] : jarKey;
+    // In manual mode, pass the full jar key (e.g., 'g2-medium') to allow switching between difficulties
+    // In fixed mode, pass just the base type (e.g., 'g2')
+    const switchTarget = difficultyMode === 'manual' ? jarKey : jarKey;
     
     return (
       <div style={{ 
@@ -148,7 +151,7 @@ export default function TaskRunnerLayout({
                     background: 'rgba(255, 255, 255, 0.5)',
                     cursor: 'pointer'
                   }}
-                  onClick={() => onSwitchTask(baseType)}
+                  onClick={() => onSwitchTask(switchTarget)}
                   title="Click to switch to this task type"
                 >
                   ↻ Switch
@@ -173,7 +176,7 @@ export default function TaskRunnerLayout({
                     fontWeight: 'bold',
                     cursor: isCurrentTask ? 'default' : 'pointer'
                   }}
-                  onClick={!isActiveType && i === 0 ? () => onSwitchTask(baseType) : undefined}
+                  onClick={!isActiveType && i === 0 ? () => onSwitchTask(switchTarget) : undefined}
                   >
                     {isCurrentTask ? 'Current' : ''}
                   </div>
@@ -183,7 +186,7 @@ export default function TaskRunnerLayout({
           ) : (
             // Empty State - Refill Button
             <button 
-              onClick={() => onRefill && onRefill(baseType)}
+              onClick={() => onRefill && onRefill(switchTarget.split('-')[0])}
               style={{
                 width: '100%',
                 padding: '10px 5px',
@@ -394,6 +397,53 @@ export default function TaskRunnerLayout({
               {renderJar('g2', 'Materials', '🎯', '#4CAF50', '#e8f5e9', jars.g2)}
               {renderJar('g1', 'Research', '📚', '#9C27B0', '#f3e5f5', jars.g1)}
               {renderJar('g3', 'Engagement', '✉️', '#f44336', '#ffebee', jars.g3)}
+            </div>
+          )}
+          
+          {/* Finish Now Button - Show when all tasks are completed */}
+          {allTasksCompleted && (
+            <div style={{
+              marginTop: '20px',
+              padding: '15px',
+              background: '#fff3cd',
+              borderRadius: '8px',
+              border: '2px solid #ffc107',
+              textAlign: 'center'
+            }}>
+              <p style={{ 
+                fontSize: '13px', 
+                color: '#856404', 
+                margin: '0 0 12px 0',
+                lineHeight: '1.5'
+              }}>
+                ✅ All tasks completed! You can either finish early or continue by refilling jars.
+              </p>
+              <button
+                onClick={onFinishNow}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  background: '#4CAF50',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontSize: '14px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                  transition: 'all 0.2s'
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.background = '#45a049';
+                  e.currentTarget.style.transform = 'translateY(-1px)';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.background = '#4CAF50';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                }}
+              >
+                ✅ Finish Now
+              </button>
             </div>
           )}
         </div>

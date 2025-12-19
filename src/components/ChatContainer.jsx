@@ -408,6 +408,8 @@ export default function ChatContainer({
   calculateStudentLearning = () => 0,
   aiCost = 0,
   onAiCost,
+  aiDelay = 0,
+  onPauseTimer = null, // Function to pause timer (like refill freeze)
 }) {
   // Get the game config to check if AI is enabled
   const [hasAI, setHasAI] = useState(true);
@@ -432,13 +434,13 @@ export default function ChatContainer({
     const syncCount = () => {
       setAiUsageCount(aiTaskHelper.totalAIUsage);
     };
-    
+
     // Check every second if the count needs syncing (for semester resets)
     const interval = setInterval(syncCount, 1000);
-    
+
     // Also sync immediately
     syncCount();
-    
+
     return () => clearInterval(interval);
   }, []);
 
@@ -521,6 +523,11 @@ export default function ChatContainer({
     }
     setLastHelpTime((prev) => ({ ...prev, [gameType]: now }));
 
+    // Pause timer if AI delay is configured (like refill freeze)
+    if (aiDelay > 0 && onPauseTimer) {
+      onPauseTimer(aiDelay, "AI Help");
+    }
+
     switch (gameType) {
       case "materials":
         handleSliderHelp();
@@ -593,9 +600,7 @@ export default function ChatContainer({
       {
         sender: "bot",
         text: `📊 Helping with materials...
-Suggested value: ${help.value.toFixed(
-          2
-        )}`,
+Suggested value: ${help.value.toFixed(2)}`,
       },
     ]);
   };
@@ -660,6 +665,11 @@ Found ${suggestedCount} ${countType}`,
 
   // Handler for planning/strategy help
   const handlePlanningHelp = () => {
+    // Pause timer if AI delay is configured (like refill freeze)
+    if (aiDelay > 0 && onPauseTimer) {
+      onPauseTimer(aiDelay, "AI Planning Help");
+    }
+
     const planningResponses = [
       "🎯 CRITICAL STRATEGY: Do tasks in this EXACT order → 1️⃣ Engagement (builds interest from the start) 2️⃣ Research (multiplies future materials) 3️⃣ Materials (gets all multipliers). Materials done early = WASTED points!",
       "📊 MAXIMUM SCORE ORDER: Engagement FIRST → Research SECOND → Materials LAST! Why? Engagement compounds every task, Research only multiplies FUTURE materials. Doing materials early gets ZERO multiplier!",
@@ -735,12 +745,9 @@ Found ${suggestedCount} ${countType}`,
           {
             sender: "bot",
             text: `✉️ Helping with engagement...
-Typing: "${help.text.substring(
-              0,
-              30
-            )}${help.text.length > 30 ? "..." : ""}"`,
-      }
-    ]);
+Typing: "${help.text.substring(0, 30)}${help.text.length > 30 ? "..." : ""}"`,
+          },
+        ]);
       }
     }
   };
@@ -757,12 +764,15 @@ Typing: "${help.text.substring(
 
     // Check if user has enough points
     if (aiCost > 0 && points < aiCost) {
-        setMessages(prev => [...prev, {
-            id: Date.now(),
-            text: `Not enough points! You need ${aiCost} points to use AI help.`,
-            sender: 'system'
-        }]);
-        return;
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now(),
+          text: `Not enough points! You need ${aiCost} points to use AI help.`,
+          sender: "system",
+        },
+      ]);
+      return;
     }
 
     const userMsg = {
@@ -778,27 +788,27 @@ Typing: "${help.text.substring(
 
     // AI Delay Logic
     const delaySeconds = globalConfig?.aiDelay || 0;
-    
+
     if (delaySeconds > 0) {
-        const intervalTime = 100; // Update every 100ms
-        const totalSteps = (delaySeconds * 1000) / intervalTime;
-        let currentStep = 0;
-        
-        const timer = setInterval(() => {
-            currentStep++;
-            const newProgress = (currentStep / totalSteps) * 100;
-            setProgress(newProgress);
-            
-            if (currentStep >= totalSteps) {
-                clearInterval(timer);
-                processAIResponse(userMsg.text);
-            }
-        }, intervalTime);
+      const intervalTime = 100; // Update every 100ms
+      const totalSteps = (delaySeconds * 1000) / intervalTime;
+      let currentStep = 0;
+
+      const timer = setInterval(() => {
+        currentStep++;
+        const newProgress = (currentStep / totalSteps) * 100;
+        setProgress(newProgress);
+
+        if (currentStep >= totalSteps) {
+          clearInterval(timer);
+          processAIResponse(userMsg.text);
+        }
+      }, intervalTime);
     } else {
-        processAIResponse(userMsg.text);
+      processAIResponse(userMsg.text);
     }
   };
-  
+
   const processAIResponse = async (text) => {
     try {
       // Deduct cost
@@ -832,7 +842,6 @@ Typing: "${help.text.substring(
     }
   };
 
-
   const currentGameType = getCurrentGameType();
 
   return (
@@ -864,9 +873,14 @@ Typing: "${help.text.substring(
             Student Learning: {Math.round(calculateStudentLearning())} pts
           </div>
           <div style={{ fontSize: "10px", color: "#666", marginTop: "2px" }}>
-             Mat: {(categoryPoints?.materials || 0)} × {(1 + (categoryPoints?.research || 0) * 0.15).toFixed(2)} 
-             {categoryPoints?.bonus ? ` ${categoryPoints.bonus >= 0 ? '+' : '-'} ${Math.abs(categoryPoints.bonus)} (Penalties)` : ''} 
-             + Interest
+            Mat: {categoryPoints?.materials || 0} ×{" "}
+            {(1 + (categoryPoints?.research || 0) * 0.15).toFixed(2)}
+            {categoryPoints?.bonus
+              ? ` ${categoryPoints.bonus >= 0 ? "+" : "-"} ${Math.abs(
+                  categoryPoints.bonus
+                )} (Penalties)`
+              : ""}
+            + Interest
           </div>
         </div>
       </div>
@@ -886,9 +900,25 @@ Typing: "${help.text.substring(
                 <span></span>
               </div>
               {progress > 0 && (
-                  <div style={{ width: '100%', height: '4px', background: '#eee', marginTop: '5px', borderRadius: '2px' }}>
-                      <div style={{ width: `${progress}%`, height: '100%', background: '#2196F3', borderRadius: '2px', transition: 'width 0.1s linear' }}></div>
-                  </div>
+                <div
+                  style={{
+                    width: "100%",
+                    height: "4px",
+                    background: "#eee",
+                    marginTop: "5px",
+                    borderRadius: "2px",
+                  }}
+                >
+                  <div
+                    style={{
+                      width: `${progress}%`,
+                      height: "100%",
+                      background: "#2196F3",
+                      borderRadius: "2px",
+                      transition: "width 0.1s linear",
+                    }}
+                  ></div>
+                </div>
               )}
             </div>
           )}
@@ -939,7 +969,8 @@ Typing: "${help.text.substring(
             AI Usage: {aiUsageCount} total attempts
             {currentTaskUsed && (
               <span style={{ color: "#ff9800", fontWeight: "bold" }}>
-                {" "}| Current task: 1/1 used
+                {" "}
+                | Current task: 1/1 used
               </span>
             )}
           </div>
@@ -967,11 +998,18 @@ Typing: "${help.text.substring(
                 disabled={!currentGameType || currentTaskUsed}
                 style={{
                   padding: "12px",
-                  background: currentTaskUsed ? "#ff9800" : currentGameType ? "#2196F3" : "#ccc",
+                  background: currentTaskUsed
+                    ? "#ff9800"
+                    : currentGameType
+                    ? "#2196F3"
+                    : "#ccc",
                   color: "white",
                   border: "none",
                   borderRadius: "8px",
-                  cursor: currentGameType && !currentTaskUsed ? "pointer" : "not-allowed",
+                  cursor:
+                    currentGameType && !currentTaskUsed
+                      ? "pointer"
+                      : "not-allowed",
                   fontWeight: "bold",
                   fontSize: "14px",
                   transition: "all 0.2s",
@@ -982,7 +1020,11 @@ Typing: "${help.text.substring(
                 }}
               >
                 <span style={{ fontSize: "18px" }}>🤖</span>
-                {currentTaskUsed ? "AI Used (1/1)" : currentGameType ? "Help Task" : "Start task first"}
+                {currentTaskUsed
+                  ? "AI Used (1/1)"
+                  : currentGameType
+                  ? "Help Task"
+                  : "Start task first"}
               </button>
 
               {/* Help Plan Button */}
@@ -1015,17 +1057,22 @@ Typing: "${help.text.substring(
               disabled={!currentTask.startsWith("g2") || currentTaskUsed}
               style={{
                 padding: "10px",
-                background: currentTask.startsWith("g2") && !currentTaskUsed
-                  ? "#4CAF50"
-                  : currentTaskUsed && currentTask.startsWith("g2")
-                  ? "#ff9800"
-                  : "#e0e0e0",
-                color: currentTask.startsWith("g2") || currentTaskUsed ? "white" : "#999",
+                background:
+                  currentTask.startsWith("g2") && !currentTaskUsed
+                    ? "#4CAF50"
+                    : currentTaskUsed && currentTask.startsWith("g2")
+                    ? "#ff9800"
+                    : "#e0e0e0",
+                color:
+                  currentTask.startsWith("g2") || currentTaskUsed
+                    ? "white"
+                    : "#999",
                 border: "none",
                 borderRadius: "6px",
-                cursor: currentTask.startsWith("g2") && !currentTaskUsed
-                  ? "pointer"
-                  : "not-allowed",
+                cursor:
+                  currentTask.startsWith("g2") && !currentTaskUsed
+                    ? "pointer"
+                    : "not-allowed",
                 fontWeight: "bold",
                 fontSize: "12px",
               }}
@@ -1038,17 +1085,22 @@ Typing: "${help.text.substring(
               disabled={!currentTask.startsWith("g1") || currentTaskUsed}
               style={{
                 padding: "10px",
-                background: currentTask.startsWith("g1") && !currentTaskUsed
-                  ? "#9C27B0"
-                  : currentTaskUsed && currentTask.startsWith("g1")
-                  ? "#ff9800"
-                  : "#e0e0e0",
-                color: currentTask.startsWith("g1") || currentTaskUsed ? "white" : "#999",
+                background:
+                  currentTask.startsWith("g1") && !currentTaskUsed
+                    ? "#9C27B0"
+                    : currentTaskUsed && currentTask.startsWith("g1")
+                    ? "#ff9800"
+                    : "#e0e0e0",
+                color:
+                  currentTask.startsWith("g1") || currentTaskUsed
+                    ? "white"
+                    : "#999",
                 border: "none",
                 borderRadius: "6px",
-                cursor: currentTask.startsWith("g1") && !currentTaskUsed
-                  ? "pointer"
-                  : "not-allowed",
+                cursor:
+                  currentTask.startsWith("g1") && !currentTaskUsed
+                    ? "pointer"
+                    : "not-allowed",
                 fontWeight: "bold",
                 fontSize: "12px",
               }}
@@ -1061,17 +1113,22 @@ Typing: "${help.text.substring(
               disabled={!currentTask.startsWith("g3") || currentTaskUsed}
               style={{
                 padding: "10px",
-                background: currentTask.startsWith("g3") && !currentTaskUsed
-                  ? "#f44336"
-                  : currentTaskUsed && currentTask.startsWith("g3")
-                  ? "#ff9800"
-                  : "#e0e0e0",
-                color: currentTask.startsWith("g3") || currentTaskUsed ? "white" : "#999",
+                background:
+                  currentTask.startsWith("g3") && !currentTaskUsed
+                    ? "#f44336"
+                    : currentTaskUsed && currentTask.startsWith("g3")
+                    ? "#ff9800"
+                    : "#e0e0e0",
+                color:
+                  currentTask.startsWith("g3") || currentTaskUsed
+                    ? "white"
+                    : "#999",
                 border: "none",
                 borderRadius: "6px",
-                cursor: currentTask.startsWith("g3") && !currentTaskUsed
-                  ? "pointer"
-                  : "not-allowed",
+                cursor:
+                  currentTask.startsWith("g3") && !currentTaskUsed
+                    ? "pointer"
+                    : "not-allowed",
                 fontWeight: "bold",
                 fontSize: "12px",
               }}

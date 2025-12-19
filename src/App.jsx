@@ -78,6 +78,7 @@ function App() {
   const [idleCountdown, setIdleCountdown] = useState(5);
   const [gameBlocked, setGameBlocked] = useState(false);
   const [pausedTime, setPausedTime] = useState(0);
+  const [allTasksCompleted, setAllTasksCompleted] = useState(false);
   const [currentSemester, setCurrentSemester] = useState(1);
   const [totalSemesters] = useState(2);
   const [semesterHistory, setSemesterHistory] = useState([]);
@@ -661,7 +662,11 @@ function App() {
 
     timerIntervalRef.current = setInterval(() => {
       const now = Date.now();
-      const elapsedMs = now - startTimeRef.current;
+      // Account for paused time (when gameBlocked is true)
+      const currentPausedTime = pauseStartRef.current
+        ? pausedTime + (now - pauseStartRef.current)
+        : pausedTime;
+      const elapsedMs = now - startTimeRef.current - currentPausedTime;
       const elapsedSeconds = Math.floor(elapsedMs / 1000);
 
       setGlobalTimer(elapsedSeconds);
@@ -861,9 +866,39 @@ function App() {
 
   const handleSwitchTask = (targetType) => {
     // KNAPSACK MODE ONLY: Switch between task types in the queue
-    // 1. Identify current task type
-    const currentType = taskQueue[currentTaskIndex].substring(0, 2); // e.g., 'g1'
-    if (currentType === targetType) return;
+    // In manual mode, targetType can be like 'g2-medium' (task type + difficulty)
+    // In fixed mode, targetType is just 'g2' (task type only)
+
+    // 1. Identify current task type and difficulty
+    const currentTaskId = taskQueue[currentTaskIndex];
+    const currentType = currentTaskId.substring(0, 2); // e.g., 'g1'
+
+    // Parse target - could be 'g2' or 'g2-medium'
+    let targetTaskType = targetType;
+    let targetDifficulty = null;
+    if (targetType.includes("-")) {
+      [targetTaskType, targetDifficulty] = targetType.split("-");
+    }
+
+    // Get current difficulty
+    const currentTaskNum = parseInt(currentTaskId.substring(3)) || 1;
+    const currentDifficulty =
+      currentTaskNum <= 5 ? "easy" : currentTaskNum <= 10 ? "medium" : "hard";
+
+    // In manual mode, allow switching even if same task type but different difficulty
+    // In fixed mode, prevent switching to same task type
+    if (globalConfig.difficultyMode === "manual") {
+      // Allow switching if different difficulty or different task type
+      if (
+        currentType === targetTaskType &&
+        currentDifficulty === targetDifficulty
+      ) {
+        return; // Already on this exact task type + difficulty
+      }
+    } else {
+      // Fixed mode: prevent switching to same task type
+      if (currentType === targetTaskType) return;
+    }
 
     // 2. Apply Switch Cost
     const cost = globalConfig.switchCost || 0;
@@ -893,14 +928,35 @@ function App() {
     const remainingQueue = newQueue.slice(currentTaskIndex);
     const pastQueue = newQueue.slice(0, currentTaskIndex);
 
+    // Helper to get difficulty from task ID
+    const getTaskDifficulty = (taskId) => {
+      const taskNum = parseInt(taskId.substring(3)) || 1;
+      if (taskNum <= 5) return "easy";
+      if (taskNum <= 10) return "medium";
+      return "hard";
+    };
+
     const currentTypeItems = remainingQueue.filter((id) =>
       id.startsWith(currentType)
     );
-    const targetTypeItems = remainingQueue.filter((id) =>
-      id.startsWith(targetType)
-    );
+
+    // In manual mode, filter by both task type AND difficulty if specified
+    let targetTypeItems;
+    if (globalConfig.difficultyMode === "manual" && targetDifficulty) {
+      targetTypeItems = remainingQueue.filter((id) => {
+        const matchesType = id.startsWith(targetTaskType);
+        const matchesDifficulty = getTaskDifficulty(id) === targetDifficulty;
+        return matchesType && matchesDifficulty;
+      });
+    } else {
+      // Fixed mode or no specific difficulty: just match task type
+      targetTypeItems = remainingQueue.filter((id) =>
+        id.startsWith(targetTaskType)
+      );
+    }
+
     const otherItems = remainingQueue.filter(
-      (id) => !id.startsWith(currentType) && !id.startsWith(targetType)
+      (id) => !id.startsWith(currentType) && !id.startsWith(targetTaskType)
     );
 
     // Reconstruct queue:
@@ -1227,12 +1283,10 @@ function App() {
 
         handleTabSwitch(nextTab, true);
       } else {
-        // Queue finished!
-        // Check time
-        // Queue finished!
-        // Check time
-        // End game immediately (No bonus round)
-        handleGameComplete("all_tasks_done");
+        // Queue finished! But don't end game yet - allow refilling or finishing early
+        // Set a flag to show "Finish Now" button
+        setAllTasksCompleted(true);
+        // Game will only end when player clicks "Finish Now" or time runs out
       }
     }
   };
@@ -3247,23 +3301,12 @@ function App() {
 
   // KNAPSACK MODE ONLY: Handle Refill Logic (add tasks to queue)
   const handleRefillJar = (type) => {
-    // Track refill penalty if configured
-    const refillPenalty = globalConfig.unfinishedJarPenalty || 0;
-    if (refillPenalty > 0) {
-      setCategoryPoints((prev) => ({
-        ...prev,
-        bonus: (prev.bonus || 0) - refillPenalty,
-      }));
-      setPenalties((prev) => ({
-        ...prev,
-        refill: prev.refill + refillPenalty,
-      }));
-      showNotification(`Refilling jar cost ${refillPenalty} points!`);
-    }
-
-    // 1. Check if frozen
+    // Refill costs TIME (pause), not points
+    // Pause the timer for the configured freeze time
     if (globalConfig.jarRefillFreezeTime > 0) {
+      // Pause timer by blocking game and tracking pause start
       setGameBlocked(true);
+      pauseStartRef.current = Date.now();
       setAccessDeniedReason(
         `Refilling ${
           type === "g1"
@@ -3271,16 +3314,44 @@ function App() {
             : type === "g2"
             ? "Materials"
             : "Engagement"
-        } Jar...`
+        } Jar... (Timer paused)`
       );
 
       setTimeout(() => {
+        // Resume timer by updating pausedTime
+        if (pauseStartRef.current) {
+          const pauseDuration = Date.now() - pauseStartRef.current;
+          setPausedTime((prev) => prev + pauseDuration);
+          pauseStartRef.current = null;
+        }
         setGameBlocked(false);
         setAccessDeniedReason("");
         addTasksToQueue(type, 1); // Add 1 task
+        setAllTasksCompleted(false); // Reset completion flag if refilling
       }, globalConfig.jarRefillFreezeTime * 1000);
     } else {
       addTasksToQueue(type, 1);
+      setAllTasksCompleted(false); // Reset completion flag if refilling
+    }
+  };
+
+  // Helper function to pause timer (used by refill and AI help)
+  const handlePauseTimer = (delaySeconds, reason = "Paused") => {
+    if (delaySeconds > 0) {
+      setGameBlocked(true);
+      pauseStartRef.current = Date.now();
+      setAccessDeniedReason(`${reason}... (Timer paused)`);
+
+      setTimeout(() => {
+        // Resume timer by updating pausedTime
+        if (pauseStartRef.current) {
+          const pauseDuration = Date.now() - pauseStartRef.current;
+          setPausedTime((prev) => prev + pauseDuration);
+          pauseStartRef.current = null;
+        }
+        setGameBlocked(false);
+        setAccessDeniedReason("");
+      }, delaySeconds * 1000);
     }
   };
 
@@ -3355,6 +3426,7 @@ function App() {
               onToggle={() => setIsChatOpen(!isChatOpen)}
               unreadCount={unreadCount}
               aiDelay={globalConfig.aiDelay}
+              onPauseTimer={handlePauseTimer}
               currentTask={currentTab}
               categoryPoints={categoryPoints}
             />
@@ -3409,6 +3481,7 @@ function App() {
           taskQueue={taskQueue}
           onSwitchTask={handleSwitchTask}
           onRefill={handleRefillJar}
+          onFinishNow={() => handleGameComplete("all_tasks_done")}
           allocationCounts={allocationCounts}
           points={Math.round(
             studentLearningScore -
@@ -3420,6 +3493,7 @@ function App() {
           difficultyMode={globalConfig.difficultyMode}
           categoryPoints={categoryPoints}
           globalConfig={globalConfig}
+          allTasksCompleted={allTasksCompleted}
           chatInterface={
             <ChatContainer
               messages={chatMessages}
@@ -3429,6 +3503,7 @@ function App() {
               onToggle={() => setIsChatOpen(!isChatOpen)}
               unreadCount={unreadCount}
               aiDelay={globalConfig.aiDelay}
+              onPauseTimer={handlePauseTimer}
               currentTask={taskQueue[currentTaskIndex]} // Pass current task
               categoryPoints={categoryPoints} // Pass points
             />
