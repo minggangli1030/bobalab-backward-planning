@@ -187,7 +187,7 @@ export default function TaskRunnerLayout({
           ) : (
             // Empty State - Refill Button
             <button 
-              onClick={() => onRefill && onRefill(switchTarget.split('-')[0])}
+              onClick={() => onRefill && onRefill(switchTarget)}
               style={{
                 width: '100%',
                 padding: '10px 5px',
@@ -277,9 +277,9 @@ export default function TaskRunnerLayout({
                   Materials: {categoryPoints?.materials || 0} pts<br/>
                   Research: {categoryPoints?.research || 0} pts<br/>
                   Engagement: {categoryPoints?.engagement || 0} pts<br/>
-                  {(penalties.switch > 0 || penalties.refill > 0 || penalties.unfinished > 0) && (
+                  {(penalties.switch > 0 || penalties.unfinished > 0) && (
                     <span style={{ color: '#f44336' }}>
-                      Penalties: -{penalties.switch + penalties.refill + penalties.unfinished} pts
+                      Penalties: -{penalties.switch + penalties.unfinished} pts
                     </span>
                   )}
                 </div>

@@ -662,11 +662,8 @@ function App() {
 
     timerIntervalRef.current = setInterval(() => {
       const now = Date.now();
-      // Account for paused time (when gameBlocked is true)
-      const currentPausedTime = pauseStartRef.current
-        ? pausedTime + (now - pauseStartRef.current)
-        : pausedTime;
-      const elapsedMs = now - startTimeRef.current - currentPausedTime;
+      // Timer keeps running even when screen is frozen (this is the cost of help/refill)
+      const elapsedMs = now - startTimeRef.current;
       const elapsedSeconds = Math.floor(elapsedMs / 1000);
 
       setGlobalTimer(elapsedSeconds);
@@ -3300,13 +3297,20 @@ function App() {
   }
 
   // KNAPSACK MODE ONLY: Handle Refill Logic (add tasks to queue)
-  const handleRefillJar = (type) => {
-    // Refill costs TIME (pause), not points
-    // Pause the timer for the configured freeze time
+  const handleRefillJar = (jarKey) => {
+    // jarKey can be 'g2' (fixed mode) or 'g2-medium' (manual mode)
+    // Parse type and difficulty
+    let type = jarKey;
+    let difficulty = null;
+    if (jarKey.includes("-")) {
+      [type, difficulty] = jarKey.split("-");
+    }
+
+    // Refill costs TIME (freeze screen but timer keeps running), not points
+    // Freeze the screen for the configured freeze time
     if (globalConfig.jarRefillFreezeTime > 0) {
-      // Pause timer by blocking game and tracking pause start
+      // Freeze screen but timer keeps running (this is the cost)
       setGameBlocked(true);
-      pauseStartRef.current = Date.now();
       setAccessDeniedReason(
         `Refilling ${
           type === "g1"
@@ -3314,41 +3318,30 @@ function App() {
             : type === "g2"
             ? "Materials"
             : "Engagement"
-        } Jar... (Timer paused)`
+        }${difficulty ? ` (${difficulty})` : ""} Jar...`
       );
 
       setTimeout(() => {
-        // Resume timer by updating pausedTime
-        if (pauseStartRef.current) {
-          const pauseDuration = Date.now() - pauseStartRef.current;
-          setPausedTime((prev) => prev + pauseDuration);
-          pauseStartRef.current = null;
-        }
         setGameBlocked(false);
         setAccessDeniedReason("");
-        addTasksToQueue(type, 1); // Add 1 task
+        addTasksToQueue(type, difficulty, 1); // Add 1 task with specified difficulty
         setAllTasksCompleted(false); // Reset completion flag if refilling
       }, globalConfig.jarRefillFreezeTime * 1000);
     } else {
-      addTasksToQueue(type, 1);
+      addTasksToQueue(type, difficulty, 1);
       setAllTasksCompleted(false); // Reset completion flag if refilling
     }
   };
 
-  // Helper function to pause timer (used by refill and AI help)
+  // Helper function to freeze screen (used by refill and AI help)
+  // Screen freezes but timer keeps running - this is the cost
   const handlePauseTimer = (delaySeconds, reason = "Paused") => {
     if (delaySeconds > 0) {
+      // Freeze screen but timer keeps running (this is the cost)
       setGameBlocked(true);
-      pauseStartRef.current = Date.now();
-      setAccessDeniedReason(`${reason}... (Timer paused)`);
+      setAccessDeniedReason(`${reason}...`);
 
       setTimeout(() => {
-        // Resume timer by updating pausedTime
-        if (pauseStartRef.current) {
-          const pauseDuration = Date.now() - pauseStartRef.current;
-          setPausedTime((prev) => prev + pauseDuration);
-          pauseStartRef.current = null;
-        }
         setGameBlocked(false);
         setAccessDeniedReason("");
       }, delaySeconds * 1000);
@@ -3356,29 +3349,44 @@ function App() {
   };
 
   // KNAPSACK MODE ONLY: Add tasks to the queue when refilling jars
-  const addTasksToQueue = (type, count) => {
-    // Generate new task IDs
-    // We need to know the last ID used for this type to increment
-    // Or just random/sequential. Let's use sequential based on existing queue + completed?
-    // Simplified: just append new IDs.
-
-    // We need to find the max ID for this type currently in queue or completed
-    // This is a bit complex to track perfectly without a counter state.
-    // Let's just use a timestamp-based or simple increment if possible.
-    // Actually, let's just assume we continue from where we left off?
-    // But we don't track "next available ID" easily.
-    // Let's just use a random difficulty distribution for the new tasks?
-    // User didn't specify difficulty for refill. Let's assume balanced or random.
+  const addTasksToQueue = (type, difficulty, count) => {
+    // Generate new task IDs with the specified difficulty
+    // Difficulty mapping: easy = 1-5, medium = 6-10, hard = 11+
 
     const newTasks = [];
     for (let i = 0; i < count; i++) {
-      // For now, just use a generic ID format or random difficulty
-      // Let's say we just add "refill" tasks.
-      // We need valid IDs like g1t1, g1t2 etc for the components to work?
-      // The components take `taskNum`.
-      // Let's generate random taskNum between 1 and 100 to avoid collisions/caching issues if any
-      const taskNum = Math.floor(Math.random() * 20) + 1;
-      newTasks.push(`${type}t${taskNum}`);
+      let taskNum;
+
+      if (difficulty) {
+        // Manual mode: use specific difficulty range
+        if (difficulty === "easy") {
+          taskNum = Math.floor(Math.random() * 5) + 1; // 1-5
+        } else if (difficulty === "medium") {
+          taskNum = Math.floor(Math.random() * 5) + 6; // 6-10
+        } else {
+          // hard
+          taskNum = Math.floor(Math.random() * 10) + 11; // 11-20
+        }
+      } else {
+        // Fixed mode: random difficulty
+        taskNum = Math.floor(Math.random() * 20) + 1; // 1-20
+      }
+
+      // Generate a unique task ID by checking existing queue and completed tasks
+      const newTaskId = `${type}t${taskNum}`;
+
+      // Check if this task ID already exists in queue or completed
+      const existsInQueue = taskQueue.includes(newTaskId);
+      const existsInCompleted = completed[newTaskId] !== undefined;
+
+      // If exists, generate a new one with a timestamp suffix to ensure uniqueness
+      if (existsInQueue || existsInCompleted) {
+        const timestamp = Date.now();
+        const uniqueId = `${type}t${taskNum}_${timestamp}`;
+        newTasks.push(uniqueId);
+      } else {
+        newTasks.push(newTaskId);
+      }
     }
 
     setTaskQueue((prev) => [...prev, ...newTasks]);
@@ -3484,8 +3492,7 @@ function App() {
           onFinishNow={() => handleGameComplete("all_tasks_done")}
           allocationCounts={allocationCounts}
           points={Math.round(
-            studentLearningScore -
-              (penalties.switch + penalties.refill + penalties.unfinished)
+            studentLearningScore - (penalties.switch + penalties.unfinished)
           )}
           timeRemaining={timeRemaining}
           onTimeUp={() => handleGameComplete("time_up")}
