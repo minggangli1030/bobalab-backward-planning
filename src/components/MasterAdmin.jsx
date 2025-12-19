@@ -193,14 +193,32 @@ export default function MasterAdmin({ onClose }) {
       );
 
       // 3. Aggregate Session Data
-      const sessionStats = {}; // studentId -> { totalAccesses, scores, hasPlayed, lastPlayed... }
+      // Use displayName or studentIdentifier as the key, fallback to studentId
+      // Filter out Firebase document IDs (long random strings like "D1pEPznNGKQkYIGUjoBF")
+      const isFirebaseDocId = (id) => {
+        if (!id) return false;
+        // Firebase document IDs are typically 20 characters, alphanumeric
+        // Check if it looks like a Firebase auto-generated ID
+        return /^[A-Za-z0-9]{20,}$/.test(id) && id.length >= 20;
+      };
+
+      const sessionStats = {}; // username/identifier -> { totalAccesses, scores, hasPlayed, lastPlayed... }
 
       sessionsSnap.docs.forEach((doc) => {
         const session = doc.data();
-        const sid = session.studentId;
-
-        // Skip sessions without valid student ID or admin sessions if filtering needed
-        if (!sid) return;
+        // Use displayName or studentIdentifier first, then studentId
+        // But skip if studentId looks like a Firebase document ID
+        let sid = session.displayName || session.studentIdentifier || session.studentId;
+        
+        // Skip if no identifier or if it's a Firebase document ID
+        if (!sid || isFirebaseDocId(sid)) {
+          // If studentId is a Firebase doc ID but we have displayName, use that
+          if (session.displayName && isFirebaseDocId(session.studentId)) {
+            sid = session.displayName;
+          } else {
+            return; // Skip this session
+          }
+        }
 
         if (!sessionStats[sid]) {
           sessionStats[sid] = {
@@ -211,6 +229,7 @@ export default function MasterAdmin({ onClose }) {
             // Keep track of latest section/meta if needed for non-roster students
             section: session.section || "Unknown",
             sid: sid,
+            displayName: session.displayName || sid, // Store display name
           };
         }
 
@@ -243,9 +262,25 @@ export default function MasterAdmin({ onClose }) {
       });
 
       // 4. Merge Data
-      // Start with all Roster students
-      const mergedData = Object.values(rosterMap).map((student) => {
-        const stats = sessionStats[student.id] || {};
+      // Filter out Firebase document IDs from roster
+      const filteredRosterMap = {};
+      Object.keys(rosterMap).forEach((key) => {
+        const student = rosterMap[key];
+        // Use displayName or studentIdentifier if available, otherwise check if key is a Firebase ID
+        const identifier = student.displayName || student.studentIdentifier || student.sid || key;
+        if (!isFirebaseDocId(identifier)) {
+          filteredRosterMap[identifier] = {
+            ...student,
+            id: identifier,
+            sid: identifier,
+            displayName: student.displayName || identifier,
+          };
+        }
+      });
+
+      // Start with all Roster students (filtered)
+      const mergedData = Object.values(filteredRosterMap).map((student) => {
+        const stats = sessionStats[student.id] || sessionStats[student.sid] || {};
         return {
           ...student,
           ...stats, // Overwrite stale roster data with fresh session aggregated data
@@ -255,16 +290,20 @@ export default function MasterAdmin({ onClose }) {
           totalAccesses: stats.totalAccesses || 0,
           hasPlayed: stats.hasPlayed || false,
           lastPlayed: stats.lastPlayed || null,
+          // Use displayName from stats if available
+          displayName: stats.displayName || student.displayName || student.id,
         };
       });
 
       // Add students who are in Sessions but NOT in Roster (e.g. experimental/test users)
+      // Filter out Firebase document IDs
       Object.keys(sessionStats).forEach((sid) => {
-        if (!rosterMap[sid]) {
+        if (!isFirebaseDocId(sid) && !filteredRosterMap[sid] && !rosterMap[sid]) {
           mergedData.push({
             id: sid,
             sid: sid, // Maintain consistency with table expecting 'sid' field sometimes
             ...sessionStats[sid],
+            displayName: sessionStats[sid].displayName || sid,
           });
         }
       });
@@ -1616,7 +1655,7 @@ export default function MasterAdmin({ onClose }) {
                         style={{ borderBottom: "1px solid #eee" }}
                       >
                         <td style={{ padding: "12px", fontSize: "13px" }}>
-                          {student.sid || student.id}
+                          {student.displayName || student.sid || student.id}
                         </td>
                         <td style={{ padding: "12px", fontSize: "13px" }}>
                           {student.section || "N/A"}
