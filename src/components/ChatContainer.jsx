@@ -904,34 +904,51 @@ Typing: "${help.text.substring(0, 30)}${help.text.length > 30 ? "..." : ""}"`,
             : "AI assistance disabled for this session"}
         </div>
 
-        {/* Student Learning Score Display - always shown */}
+        {/* Points Breakdown - Detailed */}
         <div
           style={{
             marginTop: "10px",
-            padding: "8px",
+            padding: "10px",
             background: "#e3f2fd",
             borderRadius: "6px",
             border: "1px solid #2196F3",
           }}
         >
           <div
-            style={{ fontSize: "12px", color: "#1976d2", fontWeight: "bold" }}
+            style={{ fontSize: "11px", color: "#1976d2", fontWeight: "bold", marginBottom: "6px" }}
           >
-            Student Learning: {Math.round(calculateStudentLearning())} pts
+            Points Breakdown
           </div>
-          <div style={{ fontSize: "10px", color: "#666", marginTop: "2px" }}>
-            Mat: {categoryPoints?.materials || 0} ×{" "}
-            {(1 + (categoryPoints?.research || 0) * 0.15).toFixed(2)}
-            {parseFloat(localStorage.getItem("engagementInterest") || "0") >
-              0 &&
-              ` + ${parseFloat(
-                localStorage.getItem("engagementInterest") || "0"
-              ).toFixed(1)} (Interest)`}
-            {categoryPoints?.bonus
-              ? ` ${categoryPoints.bonus >= 0 ? "+" : "-"} ${Math.abs(
-                  categoryPoints.bonus
-                )} (Bonus)`
-              : ""}
+          <div style={{ fontSize: "10px", color: "#666", lineHeight: "1.6" }}>
+            {/* Formula: Materials × (1 + Research×0.15) = Result */}
+            {(() => {
+              const materials = categoryPoints?.materials || 0;
+              const research = categoryPoints?.research || 0;
+              const interest = parseFloat(localStorage.getItem("engagementInterest") || "0") || 0;
+              const bonus = categoryPoints?.bonus || 0;
+              const multiplier = 1 + research * 0.15;
+              const materialsWithMultiplier = materials * multiplier;
+              const total = materialsWithMultiplier + interest + bonus;
+              
+              return (
+                <>
+                  <div style={{ marginBottom: "4px" }}>
+                    <strong>{materials} × (1 + {research}×0.15) = {materialsWithMultiplier.toFixed(1)}</strong>
+                    {interest > 0 && (
+                      <><br/>Interest: +{interest.toFixed(1)}</>
+                    )}
+                    {bonus !== 0 && (
+                      <><br/>Bonus: {bonus >= 0 ? "+" : ""}{bonus.toFixed(1)}</>
+                    )}
+                    <br/><strong>Total: {total.toFixed(1)}</strong>
+                  </div>
+                  <div style={{ fontSize: "9px", color: "#888", marginTop: "4px", paddingTop: "4px", borderTop: "1px solid #bbdefb" }}>
+                    Materials: {materials} | Research: {research} | Engagement: {categoryPoints?.engagement || 0}
+                    {interest > 0 && ` | Interest: ${interest.toFixed(1)}`}
+                  </div>
+                </>
+              );
+            })()}
           </div>
         </div>
       </div>

@@ -257,45 +257,25 @@ export default function TaskRunnerLayout({
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontSize: '12px', color: '#666', marginBottom: '4px' }}>Student Learning Score</div>
           <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#2196F3' }}>
-            {points}
+            {typeof points === 'number' ? points.toFixed(1) : points}
           </div>
-          {/* Points Breakdown - Wider, less tall */}
+          {/* Rules Only - Simplified */}
           <div style={{ 
             marginTop: '10px', 
             fontSize: '10px', 
             color: '#666',
-            textAlign: 'left',
+            textAlign: 'center',
             background: '#f5f5f5',
             padding: '10px 12px',
             borderRadius: '6px',
             width: '280px',
             margin: '10px auto 0'
           }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-              {/* Rules Column */}
-              <div>
-                <div style={{ fontWeight: '600', marginBottom: '4px', color: '#333', fontSize: '10px' }}>Rules:</div>
-                <div style={{ fontSize: '9px', lineHeight: '1.5' }}>
-                  Switch: -{globalConfig?.switchCost || 0} pts<br/>
-                  Refill: {globalConfig?.jarRefillFreezeTime || 0}s pause<br/>
-                  Unfinished: -{globalConfig?.unfinishedTaskPenalty || 0} pts
-                </div>
-              </div>
-              {/* Formula Column */}
-              <div>
-                <div style={{ fontWeight: '600', marginBottom: '4px', color: '#333', fontSize: '10px' }}>Formula:</div>
-                <div style={{ fontSize: '9px', lineHeight: '1.5' }}>
-                  Mat: {categoryPoints?.materials || 0} × {(1 + (categoryPoints?.research || 0) * 0.15).toFixed(2)}<br/>
-                  {engagementInterest > 0 && (
-                    <>Interest: +{engagementInterest.toFixed(1)}<br/></>
-                  )}
-                  {(penalties.switch > 0 || penalties.unfinished > 0) && (
-                    <span style={{ color: '#f44336' }}>
-                      Penalties: -{penalties.switch + penalties.unfinished}
-                    </span>
-                  )}
-                </div>
-              </div>
+            <div style={{ fontWeight: '600', marginBottom: '4px', color: '#333', fontSize: '10px' }}>Rules:</div>
+            <div style={{ fontSize: '9px', lineHeight: '1.5' }}>
+              Switch: -{globalConfig?.switchCost || 0} pts<br/>
+              Refill: {globalConfig?.jarRefillFreezeTime || 0}s pause<br/>
+              Unfinished: -{globalConfig?.unfinishedTaskPenalty || 0} pts
             </div>
           </div>
         </div>

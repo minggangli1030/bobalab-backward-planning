@@ -208,8 +208,9 @@ export default function MasterAdmin({ onClose }) {
         const session = doc.data();
         // Use displayName or studentIdentifier first, then studentId
         // But skip if studentId looks like a Firebase document ID
-        let sid = session.displayName || session.studentIdentifier || session.studentId;
-        
+        let sid =
+          session.displayName || session.studentIdentifier || session.studentId;
+
         // Skip if no identifier or if it's a Firebase document ID
         if (!sid || isFirebaseDocId(sid)) {
           // If studentId is a Firebase doc ID but we have displayName, use that
@@ -267,7 +268,11 @@ export default function MasterAdmin({ onClose }) {
       Object.keys(rosterMap).forEach((key) => {
         const student = rosterMap[key];
         // Use displayName or studentIdentifier if available, otherwise check if key is a Firebase ID
-        const identifier = student.displayName || student.studentIdentifier || student.sid || key;
+        const identifier =
+          student.displayName ||
+          student.studentIdentifier ||
+          student.sid ||
+          key;
         if (!isFirebaseDocId(identifier)) {
           filteredRosterMap[identifier] = {
             ...student,
@@ -280,7 +285,8 @@ export default function MasterAdmin({ onClose }) {
 
       // Start with all Roster students (filtered)
       const mergedData = Object.values(filteredRosterMap).map((student) => {
-        const stats = sessionStats[student.id] || sessionStats[student.sid] || {};
+        const stats =
+          sessionStats[student.id] || sessionStats[student.sid] || {};
         return {
           ...student,
           ...stats, // Overwrite stale roster data with fresh session aggregated data
@@ -298,7 +304,11 @@ export default function MasterAdmin({ onClose }) {
       // Add students who are in Sessions but NOT in Roster (e.g. experimental/test users)
       // Filter out Firebase document IDs
       Object.keys(sessionStats).forEach((sid) => {
-        if (!isFirebaseDocId(sid) && !filteredRosterMap[sid] && !rosterMap[sid]) {
+        if (
+          !isFirebaseDocId(sid) &&
+          !filteredRosterMap[sid] &&
+          !rosterMap[sid]
+        ) {
           mergedData.push({
             id: sid,
             sid: sid, // Maintain consistency with table expecting 'sid' field sometimes
