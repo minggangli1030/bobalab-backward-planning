@@ -84,8 +84,11 @@ function App() {
   const [randomSeed, setRandomSeed] = useState(null);
   const [checkpointReached, setCheckpointReached] = useState(false);
   const [checkpointBonus, setCheckpointBonus] = useState(0);
-  // Pre-generated slider patterns for consistent sequences
+  // Pre-generated patterns for consistent sequences (all task types)
   const [sliderPatterns, setSliderPatterns] = useState({});
+  const [countingPatterns, setCountingPatterns] = useState({});
+  const [typingPatterns, setTypingPatterns] = useState({});
+  const [textPassages, setTextPassages] = useState({}); // Pre-generated text passages for counting
   const [currentPractice, setCurrentPractice] = useState(null);
   const [practiceCompleted, setPracticeCompleted] = useState({
     g2t1: false, // Materials (was slider)
@@ -737,12 +740,21 @@ function App() {
       setRandomSeed(seed);
       patternGenerator.initializeSeed(seed);
 
-      // Pre-generate all slider patterns (1-100) for this user
-      const patterns = {};
+      // Pre-generate all patterns (1-100) for this user for all task types
+      const sliderPats = {};
+      const countingPats = {};
+      const typingPats = {};
+      const passages = {};
       for (let level = 1; level <= 100; level++) {
-        patterns[level] = patternGenerator.generateSliderPattern(level);
+        sliderPats[level] = patternGenerator.generateSliderPattern(level);
+        countingPats[level] = patternGenerator.generateCountingPattern(level);
+        typingPats[level] = patternGenerator.generateTypingPattern(level);
+        passages[level] = patternGenerator.getTextPassage(level);
       }
-      setSliderPatterns(patterns);
+      setSliderPatterns(sliderPats);
+      setCountingPatterns(countingPats);
+      setTypingPatterns(typingPats);
+      setTextPassages(passages);
 
       if (sessionId && !sessionId.startsWith("offline-")) {
         updateDoc(doc(db, "sessions", sessionId), {
@@ -754,11 +766,20 @@ function App() {
       // If seed already exists, regenerate patterns if not already stored
       if (Object.keys(sliderPatterns).length === 0) {
         patternGenerator.initializeSeed(randomSeed);
-        const patterns = {};
+        const sliderPats = {};
+        const countingPats = {};
+        const typingPats = {};
+        const passages = {};
         for (let level = 1; level <= 100; level++) {
-          patterns[level] = patternGenerator.generateSliderPattern(level);
+          sliderPats[level] = patternGenerator.generateSliderPattern(level);
+          countingPats[level] = patternGenerator.generateCountingPattern(level);
+          typingPats[level] = patternGenerator.generateTypingPattern(level);
+          passages[level] = patternGenerator.getTextPassage(level);
         }
-        setSliderPatterns(patterns);
+        setSliderPatterns(sliderPats);
+        setCountingPatterns(countingPats);
+        setTypingPatterns(typingPats);
+        setTextPassages(passages);
       }
     }
 
@@ -1450,12 +1471,17 @@ function App() {
     const isPractice = mode === "practice";
 
     if (game === "1") {
+      // Use pre-generated pattern if available
+      const preGeneratedPattern = countingPatterns[taskNum];
+      const preGeneratedText = textPassages[taskNum];
       return (
         <CountingTask
           taskNum={taskNum}
           onComplete={isPractice ? handlePracticeComplete : handleComplete}
           currentTaskId={currentTab}
           isPractice={isPractice}
+          preGeneratedPattern={preGeneratedPattern}
+          preGeneratedText={preGeneratedText}
         />
       );
     }
@@ -1472,12 +1498,15 @@ function App() {
         />
       );
     }
+    // Use pre-generated pattern if available
+    const preGeneratedPattern = typingPatterns[taskNum];
     return (
       <TypingTask
         taskNum={taskNum}
         onComplete={isPractice ? handlePracticeComplete : handleComplete}
         currentTaskId={currentTab}
         isPractice={isPractice}
+        preGeneratedPattern={preGeneratedPattern}
       />
     );
   };
@@ -2570,12 +2599,21 @@ function App() {
       setRandomSeed(newSeed);
       patternGenerator.initializeSeed(newSeed);
 
-      // Pre-generate all slider patterns for new semester
-      const patterns = {};
+      // Pre-generate all patterns for new semester
+      const sliderPats = {};
+      const countingPats = {};
+      const typingPats = {};
+      const passages = {};
       for (let level = 1; level <= 100; level++) {
-        patterns[level] = patternGenerator.generateSliderPattern(level);
+        sliderPats[level] = patternGenerator.generateSliderPattern(level);
+        countingPats[level] = patternGenerator.generateCountingPattern(level);
+        typingPats[level] = patternGenerator.generateTypingPattern(level);
+        passages[level] = patternGenerator.getTextPassage(level);
       }
-      setSliderPatterns(patterns);
+      setSliderPatterns(sliderPats);
+      setCountingPatterns(countingPats);
+      setTypingPatterns(typingPats);
+      setTextPassages(passages);
     };
 
     const isLastSemester = currentSemester >= totalSemesters;
@@ -3126,7 +3164,7 @@ function App() {
   };
 
   // Render Task Runner
-  // SEQUENTIAL MODE: Use NavTabsEnhanced layout
+  // SEQUENTIAL MODE: Use NavTabsEnhanced layout with side-by-side AI chat
   if (mode === "challenge" && currentGameMode === "sequential") {
     return (
       <div className="app">
@@ -3138,20 +3176,40 @@ function App() {
           categoryPoints={categoryPoints}
           timeRemaining={timeRemaining}
         />
-        <div style={{ maxWidth: "1200px", margin: "0 auto", padding: "20px" }}>
-          {renderTask()}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 340px",
+            gap: "20px",
+            maxWidth: "1400px",
+            margin: "0 auto",
+            padding: "20px",
+          }}
+        >
+          <div
+            style={{
+              background: "white",
+              borderRadius: "12px",
+              padding: "20px",
+              boxShadow: "0 2px 10px rgba(0,0,0,0.1)",
+            }}
+          >
+            {renderTask()}
+          </div>
+          <div style={{ height: "fit-content" }}>
+            <ChatContainer
+              messages={chatMessages}
+              onSendMessage={handleSendMessage}
+              isAiTyping={isAiTyping}
+              isOpen={isChatOpen}
+              onToggle={() => setIsChatOpen(!isChatOpen)}
+              unreadCount={unreadCount}
+              aiDelay={globalConfig.aiDelay}
+              currentTask={currentTab}
+              categoryPoints={categoryPoints}
+            />
+          </div>
         </div>
-        <ChatContainer
-          messages={chatMessages}
-          onSendMessage={handleSendMessage}
-          isAiTyping={isAiTyping}
-          isOpen={isChatOpen}
-          onToggle={() => setIsChatOpen(!isChatOpen)}
-          unreadCount={unreadCount}
-          aiDelay={globalConfig.aiDelay}
-          currentTask={currentTab}
-          categoryPoints={categoryPoints}
-        />
       </div>
     );
   }
@@ -3206,6 +3264,7 @@ function App() {
           timeRemaining={timeRemaining}
           onTimeUp={() => handleGameComplete("time_up")}
           penalties={penalties}
+          difficultyMode={globalConfig.difficultyMode}
           chatInterface={
             <ChatContainer
               messages={chatMessages}

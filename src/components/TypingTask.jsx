@@ -11,6 +11,7 @@ export default function TypingTask({
   onComplete,
   isPractice = false,
   currentTaskId,
+  preGeneratedPattern = null,
 }) {
   const [pattern, setPattern] = useState("");
   const [input, setInput] = useState("");
@@ -42,7 +43,8 @@ export default function TypingTask({
   };
 
   useEffect(() => {
-    const generatedPattern = patternGenerator.generateTypingPattern(taskNum);
+    // Use pre-generated pattern if available, otherwise generate on the fly
+    const generatedPattern = preGeneratedPattern || patternGenerator.generateTypingPattern(taskNum);
 
     // Store the actual pattern that will be used
     const actualPattern = generatedPattern.pattern;
@@ -52,7 +54,7 @@ export default function TypingTask({
     // Generate image with the actual pattern
     const imageUrl = generatePatternImage(actualPattern);
     setPatternImageUrl(imageUrl);
-  }, [taskNum]);
+  }, [taskNum, preGeneratedPattern]);
 
   // Clear input when task changes
   useEffect(() => {

@@ -11,6 +11,8 @@ export default function CountingTask({
   onComplete,
   isPractice = false,
   currentTaskId, // currently unused but kept for compatibility
+  preGeneratedPattern = null,
+  preGeneratedText = null,
 }) {
   const [target, setTarget] = useState("");
   const [instruction, setInstruction] = useState("");
@@ -329,8 +331,9 @@ export default function CountingTask({
 
   // Initialize task content, correct answer, and first image
   useEffect(() => {
-    const pattern = patternGenerator.generateCountingPattern(taskNum);
-    const textContent = patternGenerator.getTextPassage(taskNum);
+    // Use pre-generated pattern if available, otherwise generate on the fly
+    const pattern = preGeneratedPattern || patternGenerator.generateCountingPattern(taskNum);
+    const textContent = preGeneratedText || patternGenerator.getTextPassage(taskNum);
 
     setText(textContent);
     setTarget(pattern.target || pattern.targets?.join(", "));
@@ -358,7 +361,7 @@ export default function CountingTask({
 
     const imageUrl = generateTextImage(textContent, null);
     setTextImageUrl(imageUrl);
-  }, [taskNum]);
+  }, [taskNum, preGeneratedPattern, preGeneratedText]);
 
   const calculateAccuracy = (userAnswer, correctAnswer) => {
     if (userAnswer === correctAnswer) return 100;

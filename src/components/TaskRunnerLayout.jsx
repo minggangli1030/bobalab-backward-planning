@@ -12,7 +12,8 @@ export default function TaskRunnerLayout({
   timeRemaining,
   onTimeUp,
   penalties = { switch: 0, refill: 0, unfinished: 0 },
-  chatInterface
+  chatInterface,
+  difficultyMode = "fixed" // "fixed" or "manual"
 }) {
   const currentTaskType = taskQueue[currentTaskIndex];
   
@@ -46,21 +47,56 @@ export default function TaskRunnerLayout({
   
   const upcomingQueue = taskQueue.slice(currentTaskIndex); // Includes current
   
-  const jars = {
-    g2: upcomingQueue.filter(id => id.startsWith('g2')), // Materials
-    g1: upcomingQueue.filter(id => id.startsWith('g1')), // Research
-    g3: upcomingQueue.filter(id => id.startsWith('g3'))  // Engagement
+  // Determine difficulty from task ID: 1-5 = easy, 6-10 = medium, 11+ = hard
+  const getDifficulty = (taskId) => {
+    const taskNum = parseInt(taskId.substring(3)) || 1;
+    if (taskNum <= 5) return 'easy';
+    if (taskNum <= 10) return 'medium';
+    return 'hard';
+  };
+  
+  // Group tasks by type and difficulty for manual mode (9 jars)
+  // Or by type only for fixed mode (3 jars)
+  let jars;
+  if (difficultyMode === 'manual') {
+    // 9 jars: 3 tasks × 3 difficulties
+    jars = {
+      'g2-easy': upcomingQueue.filter(id => id.startsWith('g2') && getDifficulty(id) === 'easy'),
+      'g2-medium': upcomingQueue.filter(id => id.startsWith('g2') && getDifficulty(id) === 'medium'),
+      'g2-hard': upcomingQueue.filter(id => id.startsWith('g2') && getDifficulty(id) === 'hard'),
+      'g1-easy': upcomingQueue.filter(id => id.startsWith('g1') && getDifficulty(id) === 'easy'),
+      'g1-medium': upcomingQueue.filter(id => id.startsWith('g1') && getDifficulty(id) === 'medium'),
+      'g1-hard': upcomingQueue.filter(id => id.startsWith('g1') && getDifficulty(id) === 'hard'),
+      'g3-easy': upcomingQueue.filter(id => id.startsWith('g3') && getDifficulty(id) === 'easy'),
+      'g3-medium': upcomingQueue.filter(id => id.startsWith('g3') && getDifficulty(id) === 'medium'),
+      'g3-hard': upcomingQueue.filter(id => id.startsWith('g3') && getDifficulty(id) === 'hard'),
+    };
+  } else {
+    // 3 jars: by type only (fixed mode)
+    jars = {
+      g2: upcomingQueue.filter(id => id.startsWith('g2')), // Materials
+      g1: upcomingQueue.filter(id => id.startsWith('g1')), // Research
+      g3: upcomingQueue.filter(id => id.startsWith('g3'))  // Engagement
+    };
+  }
+
+  const isCurrent = (type) => {
+    if (difficultyMode === 'manual') {
+      // For manual mode, check if current task matches type-difficulty combo
+      const currentDifficulty = getDifficulty(currentTaskType);
+      return currentTaskType.startsWith(type.split('-')[0]) && currentDifficulty === type.split('-')[1];
+    } else {
+      return currentTaskType.startsWith(type);
+    }
   };
 
-  const isCurrent = (type) => currentTaskType.startsWith(type);
-
-  const renderJar = (type, label, icon, color, bgColor, tasks) => {
+  const renderJar = (jarKey, label, icon, color, bgColor, tasks, difficulty = null) => {
     const count = tasks.length;
-    const isActiveType = isCurrent(type);
+    const isActiveType = isCurrent(jarKey);
     const hasTasks = count > 0;
     
-    // If this is the active type, the top task is the one we are working on.
-    // If it's not active, the top task is the switch target.
+    // Extract base type for switching (e.g., 'g2' from 'g2-easy')
+    const baseType = difficultyMode === 'manual' ? jarKey.split('-')[0] : jarKey;
     
     return (
       <div style={{ 
@@ -92,44 +128,36 @@ export default function TaskRunnerLayout({
         }}>
           {hasTasks ? (
             <>
-              {/* Stacked blocks for tasks */}
-              {tasks.slice(1).map((t, i) => (
-                 <div key={i} style={{
-                   height: '8px',
-                   width: '80%',
-                   background: color,
-                   opacity: 0.4,
-                   borderRadius: '4px',
-                   margin: '0 auto'
-                 }} />
-              ))}
-              
-              {/* Top Task (Button) */}
-              <button
-                onClick={() => !isActiveType && onSwitchTask(type)}
-                disabled={isActiveType}
-                style={{
-                  width: '100%',
-                  padding: '15px 5px',
-                  background: isActiveType ? color : 'white',
-                  color: isActiveType ? 'white' : color,
-                  border: `2px solid ${color}`,
-                  borderRadius: '8px',
-                  cursor: isActiveType ? 'default' : 'pointer',
-                  fontWeight: 'bold',
-                  fontSize: '12px',
-                  boxShadow: '0 2px 5px rgba(0,0,0,0.1)',
-                  transition: 'transform 0.1s',
-                  zIndex: 2
-                }}
-              >
-                {isActiveType ? 'Current' : 'Switch'}
-              </button>
+              {/* Stacked blocks for ALL tasks - x tasks = x pallets */}
+              {tasks.map((t, i) => {
+                const isCurrentTask = i === 0 && isActiveType;
+                return (
+                  <div key={i} style={{
+                    height: isCurrentTask ? '35px' : '8px',
+                    width: '80%',
+                    background: color,
+                    opacity: isCurrentTask ? 1 : 0.4,
+                    borderRadius: '4px',
+                    margin: '0 auto',
+                    display: isCurrentTask ? 'flex' : 'block',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: isCurrentTask ? 'white' : 'transparent',
+                    fontSize: '10px',
+                    fontWeight: 'bold',
+                    cursor: isCurrentTask ? 'default' : 'pointer'
+                  }}
+                  onClick={!isActiveType && i === 0 ? () => onSwitchTask(baseType) : undefined}
+                  >
+                    {isCurrentTask ? 'Current' : ''}
+                  </div>
+                );
+              })}
             </>
           ) : (
             // Empty State - Refill Button
             <button 
-              onClick={() => onRefill && onRefill(type)}
+              onClick={() => onRefill && onRefill(baseType)}
               style={{
                 width: '100%',
                 padding: '10px 5px',
@@ -146,7 +174,10 @@ export default function TaskRunnerLayout({
           )}
         </div>
         
-        <div style={{ fontSize: '12px', color: '#666', marginTop: '5px' }}>{label}</div>
+        <div style={{ fontSize: '12px', color: '#666', marginTop: '5px', textAlign: 'center' }}>
+          {label}
+          {difficulty && <div style={{ fontSize: '10px', color: '#999' }}>{difficulty}</div>}
+        </div>
       </div>
     );
   };
@@ -260,16 +291,37 @@ export default function TaskRunnerLayout({
         }}>
           <h3 style={{ margin: '0 0 15px 0', fontSize: '16px', color: '#666', textAlign: 'center' }}>Task Jars</h3>
           
-          <div style={{ 
-            display: 'grid', 
-            gridTemplateColumns: '1fr 1fr 1fr', 
-            gap: '10px',
-            flex: 1
-          }}>
-            {renderJar('g2', 'Materials', '🎯', '#4CAF50', '#e8f5e9', jars.g2)}
-            {renderJar('g1', 'Research', '📚', '#9C27B0', '#f3e5f5', jars.g1)}
-            {renderJar('g3', 'Engagement', '✉️', '#f44336', '#ffebee', jars.g3)}
-          </div>
+          {difficultyMode === 'manual' ? (
+            // 9 jars: 3 tasks × 3 difficulties
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(3, 1fr)', 
+              gap: '8px',
+              flex: 1
+            }}>
+              {renderJar('g2-easy', 'Materials', '🎯', '#4CAF50', '#e8f5e9', jars['g2-easy'], 'Easy')}
+              {renderJar('g2-medium', 'Materials', '🎯', '#4CAF50', '#e8f5e9', jars['g2-medium'], 'Medium')}
+              {renderJar('g2-hard', 'Materials', '🎯', '#4CAF50', '#e8f5e9', jars['g2-hard'], 'Hard')}
+              {renderJar('g1-easy', 'Research', '📚', '#9C27B0', '#f3e5f5', jars['g1-easy'], 'Easy')}
+              {renderJar('g1-medium', 'Research', '📚', '#9C27B0', '#f3e5f5', jars['g1-medium'], 'Medium')}
+              {renderJar('g1-hard', 'Research', '📚', '#9C27B0', '#f3e5f5', jars['g1-hard'], 'Hard')}
+              {renderJar('g3-easy', 'Engagement', '✉️', '#f44336', '#ffebee', jars['g3-easy'], 'Easy')}
+              {renderJar('g3-medium', 'Engagement', '✉️', '#f44336', '#ffebee', jars['g3-medium'], 'Medium')}
+              {renderJar('g3-hard', 'Engagement', '✉️', '#f44336', '#ffebee', jars['g3-hard'], 'Hard')}
+            </div>
+          ) : (
+            // 3 jars: by type only (fixed mode)
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: '1fr 1fr 1fr', 
+              gap: '10px',
+              flex: 1
+            }}>
+              {renderJar('g2', 'Materials', '🎯', '#4CAF50', '#e8f5e9', jars.g2)}
+              {renderJar('g1', 'Research', '📚', '#9C27B0', '#f3e5f5', jars.g1)}
+              {renderJar('g3', 'Engagement', '✉️', '#f44336', '#ffebee', jars.g3)}
+            </div>
+          )}
         </div>
 
         {/* Center Column: Task Content */}
