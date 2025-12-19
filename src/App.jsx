@@ -353,6 +353,41 @@ function App() {
     localStorage.setItem("categoryPoints", JSON.stringify(categoryPoints));
   }, [categoryPoints]);
 
+  // Helper function to calculate student learning score
+  const calculateStudentLearning = (
+    points = categoryPoints,
+    materialsBreakdown = materialsAtResearchLevel
+  ) => {
+    // Calculate materials score with research multipliers applied only to future points
+    let materialsScore = 0;
+
+    // Go through each research level and calculate the materials points with appropriate multiplier
+    Object.entries(materialsBreakdown).forEach(([researchLevel, materials]) => {
+      const level = parseInt(researchLevel);
+      const multiplier = 1 + level * 0.15;
+      materialsScore += materials * multiplier;
+    });
+
+    // Get accumulated interest from localStorage
+    const accumulatedInterest =
+      parseFloat(localStorage.getItem("engagementInterest") || "0") || 0;
+
+    const total = materialsScore + accumulatedInterest + (points.bonus || 0);
+
+    // Student Learning Points Update with new formula display
+    const totalMaterials = points.materials || 0;
+    const researchPoints = points.research || 0;
+    console.log(
+      `📊 STUDENT LEARNING: ${total.toFixed(
+        1
+      )} pts | Materials: ${totalMaterials} (with sequential multipliers) | Research: ${researchPoints} | Interest: ${accumulatedInterest.toFixed(
+        1
+      )} = ${total.toFixed(1)}`
+    );
+
+    return isNaN(total) ? 0 : total;
+  };
+
   // Periodic refresh for score updates (every 2s)
   useEffect(() => {
     const interval = setInterval(() => {
@@ -364,7 +399,7 @@ function App() {
       setStudentLearningScore(currentScore);
     }, 2000);
     return () => clearInterval(interval);
-  }, []);
+  }, [categoryPoints, materialsAtResearchLevel]);
 
   const [tick, setTick] = useState(0);
 
@@ -579,40 +614,6 @@ function App() {
   if (window.location.search.includes("admin=true")) {
     return <AdminPage />;
   }
-
-  const calculateStudentLearning = (
-    points = categoryPoints,
-    materialsBreakdown = materialsAtResearchLevel
-  ) => {
-    // Calculate materials score with research multipliers applied only to future points
-    let materialsScore = 0;
-
-    // Go through each research level and calculate the materials points with appropriate multiplier
-    Object.entries(materialsBreakdown).forEach(([researchLevel, materials]) => {
-      const level = parseInt(researchLevel);
-      const multiplier = 1 + level * 0.15;
-      materialsScore += materials * multiplier;
-    });
-
-    // Get accumulated interest from localStorage
-    const accumulatedInterest =
-      parseFloat(localStorage.getItem("engagementInterest") || "0") || 0;
-
-    const total = materialsScore + accumulatedInterest + (points.bonus || 0);
-
-    // Student Learning Points Update with new formula display
-    const totalMaterials = points.materials || 0;
-    const researchPoints = points.research || 0;
-    console.log(
-      `📊 STUDENT LEARNING: ${total.toFixed(
-        1
-      )} pts | Materials: ${totalMaterials} (with sequential multipliers) | Research: ${researchPoints} | Interest: ${accumulatedInterest.toFixed(
-        1
-      )} = ${total.toFixed(1)}`
-    );
-
-    return isNaN(total) ? 0 : total;
-  };
 
   const handleCheckpoint = () => {
     // Check if checkpoint is enabled for this student/admin
@@ -1902,111 +1903,117 @@ function App() {
             <div className="game-info" style={{ textAlign: "left" }}>
               <div
                 style={{
-                  background: "#ffebee",
-                  borderRadius: "10px",
-                  padding: "20px",
+                  display: "grid",
+                  gridTemplateColumns: "repeat(3, 1fr)",
+                  gap: "15px",
                   marginBottom: "20px",
-                  border: "2px solid #f44336",
-                  boxShadow: "0 2px 6px rgba(244, 67, 54, 0.1)",
                 }}
               >
-                <h3
+                <div
                   style={{
-                    color: "#f44336",
-                    fontSize: "20px",
-                    marginBottom: "12px",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "10px",
-                    fontWeight: "600",
+                    background: "#ffebee",
+                    borderRadius: "10px",
+                    padding: "15px",
+                    border: "2px solid #f44336",
+                    boxShadow: "0 2px 6px rgba(244, 67, 54, 0.1)",
                   }}
                 >
-                  <span style={{ fontSize: "24px" }}>✉️</span> Engagement
-                </h3>
-                <p
-                  style={{
-                    fontSize: "16px",
-                    lineHeight: "1.6",
-                    color: "#555",
-                    margin: 0,
-                  }}
-                >
-                  Build interest that compounds! Each point adds 0.15% interest
-                  after every task completion.
-                </p>
-              </div>
+                  <h3
+                    style={{
+                      color: "#f44336",
+                      fontSize: "16px",
+                      marginBottom: "8px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      fontWeight: "600",
+                    }}
+                  >
+                    <span style={{ fontSize: "20px" }}>✉️</span> Engagement
+                  </h3>
+                  <p
+                    style={{
+                      fontSize: "13px",
+                      lineHeight: "1.5",
+                      color: "#555",
+                      margin: 0,
+                    }}
+                  >
+                    Build interest that compounds! Each point adds 0.15%
+                    interest after every task completion.
+                  </p>
+                </div>
 
-              <div
-                style={{
-                  background: "#f3e5f5",
-                  borderRadius: "10px",
-                  padding: "20px",
-                  marginBottom: "20px",
-                  border: "2px solid #9C27B0",
-                  boxShadow: "0 2px 6px rgba(156, 39, 176, 0.1)",
-                }}
-              >
-                <h3
+                <div
                   style={{
-                    color: "#9C27B0",
-                    fontSize: "20px",
-                    marginBottom: "12px",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "10px",
-                    fontWeight: "600",
+                    background: "#f3e5f5",
+                    borderRadius: "10px",
+                    padding: "15px",
+                    border: "2px solid #9C27B0",
+                    boxShadow: "0 2px 6px rgba(156, 39, 176, 0.1)",
                   }}
                 >
-                  <span style={{ fontSize: "24px" }}>📚</span> Research
-                </h3>
-                <p
-                  style={{
-                    fontSize: "16px",
-                    lineHeight: "1.6",
-                    color: "#555",
-                    margin: 0,
-                  }}
-                >
-                  Research amplifies your FUTURE materials! Each point adds +15%
-                  multiplier to materials earned after the research (order
-                  matters!).
-                </p>
-              </div>
+                  <h3
+                    style={{
+                      color: "#9C27B0",
+                      fontSize: "16px",
+                      marginBottom: "8px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      fontWeight: "600",
+                    }}
+                  >
+                    <span style={{ fontSize: "20px" }}>📚</span> Research
+                  </h3>
+                  <p
+                    style={{
+                      fontSize: "13px",
+                      lineHeight: "1.5",
+                      color: "#555",
+                      margin: 0,
+                    }}
+                  >
+                    Research amplifies your FUTURE materials! Each point adds
+                    +15% multiplier to materials earned after the research
+                    (order matters!).
+                  </p>
+                </div>
 
-              <div
-                style={{
-                  background: "#e8f5e9",
-                  borderRadius: "10px",
-                  padding: "20px",
-                  marginBottom: "20px",
-                  border: "2px solid #4CAF50",
-                  boxShadow: "0 2px 6px rgba(76, 175, 80, 0.1)",
-                }}
-              >
-                <h3
+                <div
                   style={{
-                    color: "#4CAF50",
-                    fontSize: "20px",
-                    marginBottom: "12px",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "10px",
-                    fontWeight: "600",
+                    background: "#e8f5e9",
+                    borderRadius: "10px",
+                    padding: "15px",
+                    border: "2px solid #4CAF50",
+                    boxShadow: "0 2px 6px rgba(76, 175, 80, 0.1)",
                   }}
                 >
-                  <span style={{ fontSize: "24px" }}>🎯</span> Materials
-                </h3>
-                <p
-                  style={{
-                    fontSize: "16px",
-                    lineHeight: "1.6",
-                    color: "#555",
-                    margin: 0,
-                  }}
-                >
-                  Create teaching materials - each point directly contributes to
-                  your goal points!
-                </p>
+                  <h3
+                    style={{
+                      color: "#4CAF50",
+                      fontSize: "16px",
+                      marginBottom: "8px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      fontWeight: "600",
+                    }}
+                  >
+                    <span style={{ fontSize: "20px" }}>🎯</span> Materials
+                  </h3>
+                  <p
+                    style={{
+                      fontSize: "13px",
+                      lineHeight: "1.5",
+                      color: "#555",
+                      margin: 0,
+                    }}
+                  >
+                    Create teaching materials - each point directly contributes
+                    to your goal points!
+                  </p>
+                </div>
               </div>
 
               <div
@@ -2023,40 +2030,38 @@ function App() {
                 <h3
                   style={{
                     color: "#1976d2",
-                    fontSize: "22px",
-                    marginBottom: "20px",
+                    fontSize: "18px",
+                    marginBottom: "12px",
                     display: "flex",
                     alignItems: "center",
-                    gap: "10px",
+                    gap: "8px",
                     fontWeight: "600",
                   }}
                 >
-                  <span style={{ fontSize: "28px" }}>📊</span> Student Learning
+                  <span style={{ fontSize: "22px" }}>📊</span> Student Learning
                   Formula
                 </h3>
                 <div
                   style={{
                     background: "white",
-                    padding: "20px",
-                    borderRadius: "10px",
+                    padding: "12px",
+                    borderRadius: "8px",
                     fontFamily: "monospace",
-                    fontSize: "18px",
+                    fontSize: "14px",
                     textAlign: "center",
-                    marginBottom: "20px",
+                    marginBottom: "12px",
                     border: "2px solid #2196F3",
-                    lineHeight: "1.8",
-                    boxShadow: "0 2px 4px rgba(0,0,0,0.05)",
+                    lineHeight: "1.6",
                   }}
                 >
                   Goal ={" "}
                   <strong style={{ color: "#1976d2" }}>
                     Materials × (1 + Research×0.15) + Engagement Interest
                   </strong>
-                  <br />
                   <div
                     style={{
-                      fontSize: "14px",
-                      marginTop: "12px",
+                      fontSize: "11px",
+                      marginTop: "6px",
                       fontFamily: "sans-serif",
                       color: "#666",
                     }}
@@ -2065,35 +2070,36 @@ function App() {
                     <em>after</em> the research
                   </div>
                 </div>
-                <ul
+                <div
                   style={{
-                    color: "#333",
-                    lineHeight: "2",
-                    margin: "0",
-                    paddingLeft: "25px",
-                    fontSize: "15px",
-                    textAlign: "left",
+                    display: "grid",
+                    gridTemplateColumns: "repeat(2, 1fr)",
+                    gap: "8px",
+                    fontSize: "12px",
                   }}
                 >
-                  <li>
+                  <div>
                     <strong>Scoring:</strong> Exact = 2 pts | Within 1 = 1 pt |
                     Otherwise = 0 pts
-                  </li>
-                  <li>
+                  </div>
+                  <div>
                     <strong>Timing:</strong> Task completion order affects your
                     final score
-                  </li>
-                  <li>
-                    <strong>Strategy:</strong> Think carefully about when to
-                    complete each task type!
-                  </li>
-                  {currentSemester === 2 && (
-                    <li>
-                      At minute {getCheckpointMinutes()}: Exam checkpoint with
-                      bonus opportunity (300+ Student Learning = 300 bonus)
-                    </li>
-                  )}
-                </ul>
+                  </div>
+                </div>
+                {currentSemester === 2 && (
+                  <div
+                    style={{
+                      marginTop: "8px",
+                      fontSize: "12px",
+                      color: "#f57c00",
+                      fontWeight: "600",
+                    }}
+                  >
+                    At minute {getCheckpointMinutes()}: Exam checkpoint (300+
+                    Student Learning = 300 bonus)
+                  </div>
+                )}
               </div>
 
               {/* Only show AI assistance for Section 2 students (who have AI) */}
@@ -3409,6 +3415,8 @@ function App() {
           onTimeUp={() => handleGameComplete("time_up")}
           penalties={penalties}
           difficultyMode={globalConfig.difficultyMode}
+          categoryPoints={categoryPoints}
+          globalConfig={globalConfig}
           chatInterface={
             <ChatContainer
               messages={chatMessages}

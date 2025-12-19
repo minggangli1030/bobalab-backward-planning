@@ -13,7 +13,9 @@ export default function TaskRunnerLayout({
   onTimeUp,
   penalties = { switch: 0, refill: 0, unfinished: 0 },
   chatInterface,
-  difficultyMode = "fixed" // "fixed" or "manual"
+  difficultyMode = "fixed", // "fixed" or "manual"
+  categoryPoints = { materials: 0, research: 0, engagement: 0 },
+  globalConfig = {}
 }) {
   const currentTaskType = taskQueue[currentTaskIndex];
   
@@ -129,6 +131,29 @@ export default function TaskRunnerLayout({
         }}>
           {hasTasks ? (
             <>
+              {/* Switch instruction box - dotted border on top */}
+              {!isActiveType && tasks.length > 0 && (
+                <div
+                  style={{
+                    width: '90%',
+                    height: '25px',
+                    border: '2px dashed #999',
+                    borderRadius: '4px',
+                    margin: '0 auto 8px auto',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '10px',
+                    color: '#666',
+                    background: 'rgba(255, 255, 255, 0.5)',
+                    cursor: 'pointer'
+                  }}
+                  onClick={() => onSwitchTask(baseType)}
+                  title="Click to switch to this task type"
+                >
+                  ↻ Switch
+                </div>
+              )}
               {/* Stacked blocks for ALL tasks - x tasks = x pallets */}
               {tasks.map((t, i) => {
                 const isCurrentTask = i === 0 && isActiveType;
@@ -215,32 +240,40 @@ export default function TaskRunnerLayout({
 
         {/* Center: Points */}
         <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '12px', color: '#666' }}>Total Points</div>
+          <div style={{ fontSize: '12px', color: '#666', marginBottom: '4px' }}>Total Points</div>
           <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#2196F3' }}>
             {points}
           </div>
-          {/* Penalties Display */}
-          {(penalties.switch > 0 || penalties.refill > 0 || penalties.unfinished > 0) && (
-            <div style={{ 
-              marginTop: '8px', 
-              fontSize: '11px', 
-              color: '#f44336',
-              display: 'flex',
-              gap: '8px',
-              justifyContent: 'center',
-              flexWrap: 'wrap'
-            }}>
-              {penalties.switch > 0 && (
-                <span title="Switch penalties">🔄 -{penalties.switch}</span>
-              )}
-              {penalties.refill > 0 && (
-                <span title="Refill penalties">🔄 -{penalties.refill}</span>
-              )}
-              {penalties.unfinished > 0 && (
-                <span title="Unfinished task penalties">⚠️ -{penalties.unfinished}</span>
+          {/* Points Breakdown */}
+          <div style={{ 
+            marginTop: '10px', 
+            fontSize: '10px', 
+            color: '#666',
+            textAlign: 'left',
+            background: '#f5f5f5',
+            padding: '8px',
+            borderRadius: '6px',
+            maxWidth: '200px',
+            margin: '10px auto 0'
+          }}>
+            <div style={{ fontWeight: '600', marginBottom: '4px', color: '#333' }}>Rules:</div>
+            <div style={{ fontSize: '9px', lineHeight: '1.4' }}>
+              Switch: -{globalConfig?.switchCost || 0} pts<br/>
+              Refill: -{globalConfig?.unfinishedJarPenalty || 0} pts<br/>
+              Unfinished: -{globalConfig?.unfinishedTaskPenalty || 0} pts
+            </div>
+            <div style={{ fontWeight: '600', marginTop: '6px', marginBottom: '4px', color: '#333' }}>Earnings:</div>
+            <div style={{ fontSize: '9px', lineHeight: '1.4' }}>
+              Materials: {categoryPoints?.materials || 0} pts<br/>
+              Research: {categoryPoints?.research || 0} pts<br/>
+              Engagement: {categoryPoints?.engagement || 0} pts<br/>
+              {(penalties.switch > 0 || penalties.refill > 0 || penalties.unfinished > 0) && (
+                <span style={{ color: '#f44336' }}>
+                  Penalties: -{penalties.switch + penalties.refill + penalties.unfinished} pts
+                </span>
               )}
             </div>
-          )}
+          </div>
         </div>
 
         {/* Right: Detailed Task Progress */}
