@@ -1,12 +1,44 @@
 // src/components/StudentLogin.jsx - Updated with experimental conditions
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { codeVerification } from "../utils/codeVerification";
+import { db } from "../firebase";
+import { doc, getDoc } from "firebase/firestore";
 
 export default function StudentLogin({ onLoginSuccess }) {
   const [identifier, setIdentifier] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [showTestCodes, setShowTestCodes] = useState(false);
+  const [gameTitle, setGameTitle] = useState("Can You Beat Park");
+
+  // Load game title from config
+  useEffect(() => {
+    const loadGameTitle = async () => {
+      try {
+        // First try localStorage (set by App.jsx)
+        const storedConfig = localStorage.getItem("globalConfig");
+        if (storedConfig) {
+          const config = JSON.parse(storedConfig);
+          if (config.gameTitle) {
+            setGameTitle(config.gameTitle);
+            return;
+          }
+        }
+        // Fallback to Firebase
+        const docRef = doc(db, "game_settings", "global");
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          if (data.gameTitle) {
+            setGameTitle(data.gameTitle);
+          }
+        }
+      } catch (error) {
+        console.error("Error loading game title:", error);
+      }
+    };
+    loadGameTitle();
+  }, []);
 
   // COMMENTED OUT FOR TESTING: Original Student ID validation system
   // Will be restored after internal testing is complete
@@ -330,7 +362,7 @@ export default function StudentLogin({ onLoginSuccess }) {
           >
             Scheduling Challenge:
             <br />
-            Can you beat Park?
+            {gameTitle}
           </h1>
           <p
             style={{

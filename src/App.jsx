@@ -125,6 +125,7 @@ function App() {
 
   // Global Game Configuration
   const [globalConfig, setGlobalConfig] = useState({
+    gameTitle: "Can You Beat Park",
     semesterDuration: 12,
     totalTasks: 10,
     totalSemesters: 2,
@@ -1919,7 +1920,7 @@ function App() {
                 fontWeight: "600",
               }}
             >
-              Can you beat Park? - Semester {currentSemester}/{totalSemesters}
+              {globalConfig.gameTitle || "Can You Beat Park"} - Semester {currentSemester}/{totalSemesters}
             </h1>
 
             {/* Game Info Section - Prominent */}

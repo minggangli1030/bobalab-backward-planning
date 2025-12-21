@@ -217,3 +217,4 @@ The following data is now being tracked in every event:
 - `finalScore` - Final score at game completion
 
 All events include the full game context and configuration at the time of the event.
+

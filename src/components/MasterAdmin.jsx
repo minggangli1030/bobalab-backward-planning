@@ -22,6 +22,7 @@ export default function MasterAdmin({ onClose }) {
 
   // Game Configuration State
   const [gameConfig, setGameConfig] = useState({
+    gameTitle: "Can You Beat Park",
     semesterDuration: 12,
     totalTasks: 10,
     totalSemesters: 2,
@@ -788,6 +789,34 @@ export default function MasterAdmin({ onClose }) {
               >
                 ⏱️ Time & Semesters
               </h3>
+
+              <div style={{ marginBottom: "15px" }}>
+                <label
+                  style={{
+                    display: "block",
+                    marginBottom: "5px",
+                    fontSize: "13px",
+                    fontWeight: "600",
+                  }}
+                >
+                  Game Title
+                </label>
+                <input
+                  type="text"
+                  value={gameConfig.gameTitle || "Can You Beat Park"}
+                  onChange={(e) =>
+                    handleConfigChange("gameTitle", e.target.value)
+                  }
+                  style={{
+                    width: "100%",
+                    padding: "8px",
+                    borderRadius: "4px",
+                    border: "1px solid #ddd",
+                    fontSize: "14px",
+                  }}
+                  placeholder="Can You Beat Park"
+                />
+              </div>
 
               <div style={{ marginBottom: "15px" }}>
                 <label
