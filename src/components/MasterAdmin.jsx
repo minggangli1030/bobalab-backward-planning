@@ -22,7 +22,7 @@ export default function MasterAdmin({ onClose }) {
 
   // Game Configuration State
   const [gameConfig, setGameConfig] = useState({
-    gameTitle: "Can You Beat Park",
+    gameTitle: "Welcome to Scheduling Game",
     semesterDuration: 12,
     totalTasks: 10,
     totalSemesters: 2,
@@ -803,7 +803,7 @@ export default function MasterAdmin({ onClose }) {
                 </label>
                 <input
                   type="text"
-                  value={gameConfig.gameTitle || "Can You Beat Park"}
+                  value={gameConfig.gameTitle || "Welcome to Scheduling Game"}
                   onChange={(e) =>
                     handleConfigChange("gameTitle", e.target.value)
                   }
@@ -814,7 +814,7 @@ export default function MasterAdmin({ onClose }) {
                     border: "1px solid #ddd",
                     fontSize: "14px",
                   }}
-                  placeholder="Can You Beat Park"
+                  placeholder="Welcome to Scheduling Game"
                 />
               </div>
 

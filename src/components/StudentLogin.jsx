@@ -9,7 +9,7 @@ export default function StudentLogin({ onLoginSuccess }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [showTestCodes, setShowTestCodes] = useState(false);
-  const [gameTitle, setGameTitle] = useState("Can You Beat Park");
+  const [gameTitle, setGameTitle] = useState("Welcome to Scheduling Game");
 
   // Load game title from config
   useEffect(() => {
