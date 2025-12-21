@@ -360,8 +360,6 @@ export default function StudentLogin({ onLoginSuccess }) {
               lineHeight: "1.2",
             }}
           >
-            Scheduling Challenge:
-            <br />
             {gameTitle}
           </h1>
           <p
@@ -557,38 +555,6 @@ export default function StudentLogin({ onLoginSuccess }) {
             textAlign: "center",
           }}
         >
-          <p
-            style={{
-              fontSize: "14px",
-              color: "#718096",
-              marginBottom: "12px",
-            }}
-          >
-            Having trouble? Contact your instructor:
-          </p>
-
-          <p
-            style={{
-              fontSize: "16px",
-              color: "#2196F3",
-              fontWeight: "500",
-            }}
-          >
-            Park Sinchaisri
-            <br />
-            <a
-              href="mailto:parksinchaisri@haas.berkeley.edu"
-              style={{
-                color: "#2196F3",
-                textDecoration: "none",
-                borderBottom: "1px solid #2196F3",
-                fontSize: "15px",
-              }}
-            >
-              parksinchaisri@haas.berkeley.edu
-            </a>
-          </p>
-
           {/* Admin codes display for testing - you can toggle this */}
           {showTestCodes && (
             <div
