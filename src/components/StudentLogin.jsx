@@ -72,77 +72,7 @@ export default function StudentLogin({ onLoginSuccess }) {
     },
   };
 
-  // COMMENTED OUT FOR TESTING: Original Student ID lists and validation
-  // Will be restored after internal testing is complete
-  /*
-  // Student IDs from actual rosters - evenly distributed
-  const CLASS_1A_ID_CHECKPOINT = [
-    "3040748714", "3040729812", "3040859968", "3040852909", "3040869211",
-    "3040849958", "3039838870", "15177695", "3040849997", "3039845630",
-    "3040682661", "26416809", "3039850622", "3040869510", "3031977170",
-    "3040806629", "3040848528", "3039840443", "3040848749", "3040849893",
-    "3039850830", "3039850713",
-  ];
-
-  const CLASS_1A_ID_NOCHECKPOINT = [
-    "3040850023", "22900589", "3039850570", "3040882302", "3040815651",
-    "3040701758", "3040852077", "3036343361", "3040869458", "3040705047",
-    "3040702343", "3039842887", "3040848593", "3040702603", "3039840222",
-    "3039840209", "3040861190", "18565110", "3040869302", "3040814338",
-    "3039754031",
-  ];
-
-  const CLASS_2A_ID_CHECKPOINT = [
-    "3040705476", "3040697715", "3039753992", "3040729513", "3040681595",
-    "3040850010", "3032682772", "3039842484", "3040869445", "3040814455",
-    "3039840781", "3040696831", "3040705125", "3034184066", "3039843004",
-    "3039842835", "3040860072", "3040871018", "3039839026", "3040814429",
-    "3040869094", "3040748064", "3040875945", "3040701589", "3040682193",
-    "3040729422", "3040836165", "21798975", "3038626424", "3039753017",
-    "3039840287", "3040806382",
-  ];
-
-  const CLASS_2A_ID_NOCHECKPOINT = [
-    "25958106", "3040814351", "3040848697", "3040684039", "3040869289",
-    "22971551", "3040837218", "3040864570", "3040705099", "3034288430",
-    "3040848541", "3040864531", "3040869237", "3032342054", "3040682479",
-    "3039840170", "3032397447", "3039850856", "3039840118", "3040729552",
-    "3040683181", "3040861073", "3031968434", "3040882575", "3035320237",
-    "3040823815", "3039842575", "24261697", "23420611", "3032000089",
-    "3040882341",
-  ];
-
-  // Combine all valid student IDs
-  const VALID_STUDENT_IDS = [
-    ...CLASS_1A_ID_CHECKPOINT,
-    ...CLASS_1A_ID_NOCHECKPOINT,
-    ...CLASS_2A_ID_CHECKPOINT,
-    ...CLASS_2A_ID_NOCHECKPOINT,
-  ];
-
-  // Determine experimental condition for a student
-  const getStudentCondition = (studentId) => {
-    const isSection1 =
-      CLASS_1A_ID_CHECKPOINT.includes(studentId) ||
-      CLASS_1A_ID_NOCHECKPOINT.includes(studentId);
-    const isSection2 =
-      CLASS_2A_ID_CHECKPOINT.includes(studentId) ||
-      CLASS_2A_ID_NOCHECKPOINT.includes(studentId);
-
-    const hasCheckpoint =
-      CLASS_1A_ID_CHECKPOINT.includes(studentId) ||
-      CLASS_2A_ID_CHECKPOINT.includes(studentId);
-
-    return {
-      section: isSection1 ? "01A" : isSection2 ? "02A" : "unknown",
-      hasAI: isSection2, // Section 02A gets AI
-      checkpointSemester2: hasCheckpoint,
-      displayName: `Student ${studentId} (${isSection1 ? "01A" : "02A"}-${
-        hasCheckpoint ? "CP" : "NCP"
-      })`,
-    };
-  };
-  */
+  // Original participant roster intentionally omitted from source.
 
   // TESTING MODE: Simple name-based login for internal testing
   // IMPORTANT: All internal testers get AI + Checkpoint for consistent testing experience

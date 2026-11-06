@@ -1,10 +1,20 @@
+node_modules/
+dist/
 .env
-.vercel
-
-# Data folder - exclude all data files to prevent public sharing
+.env.*
+!.env.example
+.firebaserc
+.vercel/
+.DS_Store
 data/
 *.csv
-# Exclude data JSON files but keep essential config files
-data/*.json
-firestore.indexes.json
-firestore.rules
+dump_*.json
+*service-account*.json
+*serviceAccount*.json
+__pycache__/
+*.pyc
+
+# Historical local paths; tracked copies now live under archive/ and docs/.
+qualtrics-backup/
+server.js
+FIREBASE_SETUP.md
